@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
- package org.mangui.flowplayer {
+package org.mangui.flowplayer {
     import org.mangui.hls.event.HLSEvent;
     import org.mangui.hls.utils.Params2Settings;
 
@@ -13,7 +13,6 @@
 
     import org.mangui.hls.HLS;
     import org.mangui.hls.constant.HLSPlayStates;
-
     import org.flowplayer.model.Plugin;
     import org.flowplayer.model.PluginModel;
     import org.flowplayer.view.Flowplayer;
@@ -26,11 +25,10 @@
     import org.flowplayer.model.ClipEventType;
     import org.flowplayer.model.Playlist;
     import org.flowplayer.view.StageVideoWrapper;
-    
-    CONFIG::LOGGING {
-    import org.mangui.hls.utils.Log;
-    }
 
+    CONFIG::LOGGING {
+        import org.mangui.hls.utils.Log;
+    }
     public class HLSStreamProvider  implements StreamProvider,Plugin {
         private var _volumecontroller : VolumeController;
         private var _playlist : Playlist;
@@ -44,6 +42,7 @@
         // event values
         private var _position : Number = 0;
         private var _duration : Number = 0;
+        private var _durationCapped : Number = 0;
         private var _bufferedTime : Number = 0;
         private var _videoWidth : int = -1;
         private var _videoHeight : int = -1;
@@ -57,14 +56,14 @@
 
         public function onConfig(model : PluginModel) : void {
             CONFIG::LOGGING {
-            Log.info("onConfig()");
+                Log.info("onConfig()");
             }
             _model = model;
         }
 
         public function onLoad(player : Flowplayer) : void {
             CONFIG::LOGGING {
-            Log.info("onLoad()");
+                Log.info("onLoad()");
             }
             _player = player;
             _hls = new HLS();
@@ -90,6 +89,7 @@
         private function _completeHandler(event : HLSEvent) : void {
             // dispatch a before event because the finish has default behavior that can be prevented by listeners
             _clip.dispatchBeforeEvent(new ClipEvent(ClipEventType.FINISH));
+            _clip.startDispatched = false;
         };
 
         private function _errorHandler(event : HLSEvent) : void {
@@ -100,42 +100,77 @@
         };
 
         private function _manifestHandler(event : HLSEvent) : void {
-            _duration = event.levels[_hls.startlevel].duration;
+            _duration = event.levels[_hls.startlevel].duration - _clip.start;
             _isManifestLoaded = true;
-            _clip.duration = _duration;
+            // only update duration if not capped
+            if (!_durationCapped) {
+                _clip.duration = _duration;
+            } else {
+                // ensure capped duration is lt real one
+                _durationCapped = Math.min(_durationCapped, _duration);
+            }
             _clip.stopLiveOnPause = false;
+            /*
+            var nbLevel = event.levels.length;
+            if (nbLevel > 1) {
+            var bitrates : Array = new Array();
+            for (var i : int = 0; i < nbLevel; i++) {
+            var info : Object = new Object();
+            var level : Level = event.levels[i];
+            info.bitrate = level.bitrate;
+            info.url = level.url;
+            info.width = level.width;
+            info.height = level.height;
+            info.isDefault = (i == _hls.startlevel);
+            bitrates.push(info);
+            }
+            _clip.setCustomProperty("bitrates", bitrates);
+            }
+             */
             _clip.dispatch(ClipEventType.METADATA);
             _seekable = true;
-            // if (_hls.type == HLSTypes.LIVE) {
-            // _seekable = false;
-            // } else {
-            // _seekable = true;
-            // }
-            _hls.stream.play();
-            _clip.dispatch(ClipEventType.SEEK);
+            // real seek position : add clip.start offset. if not defined, use -1 to fix seeking issue on live playlist
+            _hls.stream.play(null, (_clip.start == 0) ? -1 : _clip.start);
+            _clip.dispatch(ClipEventType.SEEK, 0);
             if (_pauseAfterStart) {
                 pause(new ClipEvent(ClipEventType.PAUSE));
             }
         };
 
         private function _mediaTimeHandler(event : HLSEvent) : void {
-            _position = Math.max(0, event.mediatime.position);
-            _duration = event.mediatime.duration;
-            _clip.duration = _duration;
-            _bufferedTime = event.mediatime.buffer + event.mediatime.position;
+            _position = Math.max(0, event.mediatime.position - _clip.start) ;
+            _duration = event.mediatime.duration - _clip.start;
+            // only update duration if not capped
+            if (!_durationCapped) {
+                _clip.duration = _duration;
+                _bufferedTime = Math.min(event.mediatime.buffer + _position, _duration);
+            } else {
+                // ensure capped duration is lt real one
+                _durationCapped = Math.min(_durationCapped, _duration);
+                _bufferedTime = Math.min(event.mediatime.buffer + _position, _durationCapped);
+                if (_durationCapped - _position <= 0.1) {
+                    // reach end of stream, stop playback and simulate complete event
+                    _hls.stream.close();
+                    _clip.dispatchBeforeEvent(new ClipEvent(ClipEventType.FINISH));
+                    _clip.startDispatched = false;
+                }
+            }
             var videoWidth : int = _video.videoWidth;
             var videoHeight : int = _video.videoHeight;
             if (videoWidth && videoHeight) {
                 var changed : Boolean = _videoWidth != videoWidth || _videoHeight != videoHeight;
                 if (changed) {
                     CONFIG::LOGGING {
-                    Log.info("video size changed to " + videoWidth + "/" + videoHeight);
+                        Log.info("video size changed to " + videoWidth + "/" + videoHeight);
                     }
                     _videoWidth = videoWidth;
                     _videoHeight = videoHeight;
                     _clip.originalWidth = videoWidth;
                     _clip.originalHeight = videoHeight;
-                    _clip.dispatch(ClipEventType.START);
+                    if (!_clip.startDispatched) {
+                        _clip.dispatch(ClipEventType.START);
+                        _clip.startDispatched = true;
+                    }
                     _clip.dispatch(ClipEventType.METADATA_CHANGED);
                 }
             }
@@ -176,10 +211,13 @@
         public function load(event : ClipEvent, clip : Clip, pauseAfterStart : Boolean = true) : void {
             _clip = clip;
             CONFIG::LOGGING {
-            Log.info("load()" + clip.completeUrl);
+                Log.info("load()" + clip.completeUrl);
+                Log.info("clip.start:" + clip.start);
+                Log.info("clip.duration:" + clip.duration);
             }
             _hls.load(clip.completeUrl);
             _pauseAfterStart = pauseAfterStart;
+            _durationCapped = clip.duration;
             clip.type = ClipType.VIDEO;
             clip.dispatch(ClipEventType.BEGIN);
             clip.setNetStream(_hls.stream);
@@ -194,12 +232,12 @@
          */
         public function getVideo(clip : Clip) : DisplayObject {
             CONFIG::LOGGING {
-            Log.debug("getVideo()");
+                Log.debug("getVideo()");
             }
             if (_video == null) {
                 if (clip.useStageVideo) {
                     CONFIG::LOGGING {
-                    Log.debug("useStageVideo");
+                        Log.debug("useStageVideo");
                     }
                     _video = new StageVideoWrapper(clip);
                 } else {
@@ -217,7 +255,7 @@
          */
         public function attachStream(video : DisplayObject) : void {
             CONFIG::LOGGING {
-            Log.debug("attachStream()");
+                Log.debug("attachStream()");
             }
             Video(video).attachNetStream(_hls.stream);
             return;
@@ -229,7 +267,7 @@
          */
         public function pause(event : ClipEvent) : void {
             CONFIG::LOGGING {
-            Log.info("pause()");
+                Log.info("pause()");
             }
             _hls.stream.pause();
             if (event) {
@@ -244,7 +282,7 @@
          */
         public function resume(event : ClipEvent) : void {
             CONFIG::LOGGING {
-            Log.info("resume()");
+                Log.info("resume()");
             }
             _hls.stream.resume();
             _clip.dispatch(ClipEventType.RESUME);
@@ -257,7 +295,7 @@
          */
         public function stop(event : ClipEvent, closeStream : Boolean = false) : void {
             CONFIG::LOGGING {
-            Log.info("stop()");
+                Log.info("stop()");
             }
             _hls.stream.close();
             return;
@@ -270,9 +308,10 @@
          */
         public function seek(event : ClipEvent, seconds : Number) : void {
             CONFIG::LOGGING {
-            Log.info("seek()");
+                Log.info("seek()");
             }
-            _hls.stream.seek(seconds);
+            // real seek position : add clip.start offset
+            _hls.stream.seek(seconds + _clip.start);
             _position = seconds;
             _bufferedTime = seconds;
             _clip.dispatch(ClipEventType.SEEK, seconds);
@@ -333,7 +372,7 @@
          */
         public function get stopping() : Boolean {
             CONFIG::LOGGING {
-            Log.info("stopping()");
+                Log.info("stopping()");
             }
             return false;
         }
@@ -351,7 +390,7 @@
 
         public function get playlist() : Playlist {
             CONFIG::LOGGING {
-            Log.debug("get playlist()");
+                Log.debug("get playlist()");
             }
             return _playlist;
         }
@@ -366,7 +405,7 @@
          */
         public function addConnectionCallback(name : String, listener : Function) : void {
             CONFIG::LOGGING {
-            Log.debug("addConnectionCallback()");
+                Log.debug("addConnectionCallback()");
             }
             return;
         }
@@ -382,7 +421,7 @@
          */
         public function addStreamCallback(name : String, listener : Function) : void {
             CONFIG::LOGGING {
-            Log.debug("addStreamCallback()");
+                Log.debug("addStreamCallback()");
             }
             return;
         }
@@ -393,7 +432,7 @@
          */
         public function get streamCallbacks() : Dictionary {
             CONFIG::LOGGING {
-            Log.debug("get streamCallbacks()");
+                Log.debug("get streamCallbacks()");
             }
             return null;
         }
@@ -404,7 +443,7 @@
          */
         public function get netStream() : NetStream {
             CONFIG::LOGGING {
-            Log.debug("get netStream()");
+                Log.debug("get netStream()");
             }
             return _hls.stream;
         }
@@ -415,7 +454,7 @@
          */
         public function get netConnection() : NetConnection {
             CONFIG::LOGGING {
-            Log.debug("get netConnection()");
+                Log.debug("get netConnection()");
             }
             return null;
         }
@@ -428,7 +467,7 @@
          */
         public function set timeProvider(timeProvider : TimeProvider) : void {
             CONFIG::LOGGING {
-            Log.debug("set timeProvider()");
+                Log.debug("set timeProvider()");
             }
             _timeProvider = timeProvider;
             return;
@@ -450,7 +489,7 @@
          */
         public function switchStream(event : ClipEvent, clip : Clip, netStreamPlayOptions : Object = null) : void {
             CONFIG::LOGGING {
-            Log.info("switchStream()");
+                Log.info("switchStream()");
             }
             return;
         }
