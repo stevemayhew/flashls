@@ -635,7 +635,7 @@ package org.mangui.hls.loader {
             } else {
                 // level switch
                 // trust program-time : if program-time defined in previous loaded fragment, try to find seqnum matching program-time in new level.
-                if (frag_previous.program_date) {
+                if (! isNaN(frag_previous.program_date)) {
                     last_seqnum = _levels[level].getSeqNumFromProgramDate(frag_previous.program_date);
                     CONFIG::LOGGING {
                         Log.debug("loadnextfragment : getSeqNumFromProgramDate(level,date,cc:" + level + "," + frag_previous.program_date + ")=" + last_seqnum);

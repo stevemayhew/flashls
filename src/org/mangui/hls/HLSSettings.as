@@ -137,6 +137,15 @@ package org.mangui.hls {
         public static var seekMode : String = HLSSeekMode.KEYFRAME_SEEK;
 
         /**
+         * reportsUnreliablePTS
+         *
+         * If true then do not assume PTS values are valid after a level switch or seek.  Some real-time
+         * transcoders cannot preserve the PTS of the original program source across start / stop transcode
+         * boundaries.  As an alternative we drop back to relying on the EXTINF and/or
+         */
+        public static var reportsUnreliablePTS : Boolean = true;
+
+        /**
          * keyLoadMaxRetry
          *
          * Max nb of retries for Key Loading in case I/O errors are met,
@@ -266,6 +275,10 @@ package org.mangui.hls {
          */
         public static var useHardwareVideoDecoder : Boolean = false;
 
+        /** Log function to log to the Browser console, default is "console.log"
+         *  NULL or empty string will log only to the flashlog.
+         */
+        public static var consoleLogFunction : String = "console.log";
         /**
          * logInfo
          *

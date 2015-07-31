@@ -61,7 +61,7 @@ $FLEXPATH/bin/mxmlc ../src/org/mangui/chromeless/ChromelessPlayer.as \
     -default-size 480 270 \
     -default-background-color=0x000000
 ./add-opt-in.py ../bin/debug/flashlsChromeless.swf
-
+exit
 #echo "Compiling flashlsBasic.swf"
 #$FLEXPATH/bin/mxmlc ../src/org/mangui/basic/Player.as \
 #   -source-path ../src \

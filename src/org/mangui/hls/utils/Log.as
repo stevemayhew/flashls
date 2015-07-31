@@ -40,8 +40,8 @@ package org.mangui.hls.utils {
 
         /** Log a message to the console. **/
         private static function outputlog(level : String, message : String) : void {
-            if (ExternalInterface.available)
-                ExternalInterface.call('console.log', level + message);
+            if (ExternalInterface.available && (HLSSettings.consoleLogFunction || "").length > 0)
+                ExternalInterface.call(HLSSettings.consoleLogFunction, level + message);
             else trace(level + message);
         }
     };

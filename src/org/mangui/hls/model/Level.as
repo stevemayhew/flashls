@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package org.mangui.hls.model {
+    import org.mangui.hls.HLSSettings;
+
     CONFIG::LOGGING {
         import org.mangui.hls.utils.Log;
     }
@@ -70,7 +72,7 @@ package org.mangui.hls.model {
         }
 
         // when switching to a redundant stream, reset fragments. they will be retrieved from new playlist
-        public function set redundantStreamId(id) : void {
+        public function set redundantStreamId(id : int) : void {
             if(id < urls.length && id != _redundantStreamId) {
                 _redundantStreamId = id;
                 fragments = new Vector.<Fragment>();
@@ -313,7 +315,7 @@ package org.mangui.hls.model {
 
         public function updateFragment(seqnum : Number, valid : Boolean, min_pts : Number = 0, max_pts : Number = 0) : void {
             // CONFIG::LOGGING {
-            // Log.info("updatePTS : seqnum/min/max:" + seqnum + '/' + min_pts + '/' + max_pts);
+            // Log.info("updatePTS : valid/seqnum/min/max:" + valid + '/' + seqnum + '/' + min_pts + '/' + max_pts);
             // }
             // get fragment from seqnum
             var fragIdx : int = getIndexfromSeqNum(seqnum);
@@ -332,20 +334,22 @@ package org.mangui.hls.model {
                 // Log.info("SN["+fragments[fragIdx].seqnum+"]:pts/duration:" + fragments[fragIdx].start_pts_computed + "/" + fragments[fragIdx].duration);
                 // }
 
-                // adjust fragment PTS/duration from seqnum-1 to frag 0
-                for (var i : int = fragIdx; i > 0 && fragments[i - 1].continuity == frag.continuity; i--) {
-                    _updatePTS(i, i - 1);
-                    // CONFIG::LOGGING {
-                    // Log.info("SN["+fragments[i-1].seqnum+"]:pts/duration:" + fragments[i-1].start_pts_computed + "/" + fragments[i-1].duration);
-                    // }
-                }
+                if (! HLSSettings.reportsUnreliablePTS) {
+                    // adjust fragment PTS/duration from seqnum-1 to frag 0
+                    for (var i : int = fragIdx; i > 0 && fragments[i - 1].continuity == frag.continuity; i--) {
+                        _updatePTS(i, i - 1);
+                        // CONFIG::LOGGING {
+                        // Log.info("SN["+fragments[i-1].seqnum+"]:pts/duration:" + fragments[i-1].start_pts_computed + "/" + fragments[i-1].duration);
+                        // }
+                    }
 
-                // adjust fragment PTS/duration from seqnum to last frag
-                for (i = fragIdx; i < fragments.length - 1 && fragments[i + 1].continuity == frag.continuity; i++) {
-                    _updatePTS(i, i + 1);
-                    // CONFIG::LOGGING {
-                    // Log.info("SN["+fragments[i+1].seqnum+"]:pts/duration:" + fragments[i+1].start_pts_computed + "/" + fragments[i+1].duration);
-                    // }
+                    // adjust fragment PTS/duration from seqnum to last frag
+                    for (i = fragIdx; i < fragments.length - 1 && fragments[i + 1].continuity == frag.continuity; i++) {
+                        _updatePTS(i, i + 1);
+                        // CONFIG::LOGGING {
+                        // Log.info("SN["+fragments[i+1].seqnum+"]:pts/duration:" + fragments[i+1].start_pts_computed + "/" + fragments[i+1].duration);
+                        // }
+                    }
                 }
 
                 // second, adjust fragment offset

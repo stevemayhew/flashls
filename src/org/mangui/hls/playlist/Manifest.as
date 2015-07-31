@@ -7,9 +7,10 @@ package org.mangui.hls.playlist {
     import flash.utils.ByteArray;
     import flash.utils.Dictionary;
     import flash.utils.getTimer;
+
+    import org.mangui.hls.HLSSettings;
     import org.mangui.hls.constant.HLSLoaderTypes;
     import org.mangui.hls.constant.HLSTypes;
-    import org.mangui.hls.event.HLSEvent;
     import org.mangui.hls.event.HLSLoadMetrics;
     import org.mangui.hls.HLS;
     import org.mangui.hls.model.Fragment;
@@ -147,7 +148,7 @@ package org.mangui.hls.playlist {
             var start_time : Number = 0;
             // nb of ms since epoch
             var program_date : Number = 0;
-            var program_date_defined : Boolean = false;
+            var program_date_defined : Boolean = HLSSettings.reportsUnreliablePTS;
             /* URL of decryption key */
             var decrypt_url : String = null;
             /* Initialization Vector */
