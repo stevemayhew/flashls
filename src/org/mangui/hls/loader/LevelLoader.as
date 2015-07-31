@@ -326,7 +326,7 @@ package org.mangui.hls.loader {
             if (_loadLevel != event.level) {
                 _loadLevel = event.level;
                 CONFIG::LOGGING {
-                    Log.debug("switch to level " + _loadLevel);
+                    Log.info("switch to level " + _loadLevel);
                 }
                 if (_type == HLSTypes.LIVE || _levels[_loadLevel].fragments.length == 0) {
                     _closed = false;
@@ -345,7 +345,7 @@ package org.mangui.hls.loader {
 
         private function _close() : void {
             CONFIG::LOGGING {
-                Log.debug("cancel any manifest load in progress");
+                Log.info("cancel any manifest load in progress");
             }
             _closed = true;
             clearTimeout(_timeoutID);

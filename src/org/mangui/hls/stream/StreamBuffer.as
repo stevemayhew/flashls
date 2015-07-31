@@ -124,7 +124,7 @@ package org.mangui.hls.stream {
                 _seekPositionRequested = Math.max(position, 0);
             }
             CONFIG::LOGGING {
-                Log.debug("seek : requested position:" + position.toFixed(2) + ",seek position:" + _seekPositionRequested.toFixed(2) + ",min/max buffer position:" + min_pos.toFixed(2) + "/" + max_pos.toFixed(2));
+                Log.info("seek : requested position:" + position.toFixed(2) + ",seek position:" + _seekPositionRequested.toFixed(2) + ",min/max buffer position:" + min_pos.toFixed(2) + "/" + max_pos.toFixed(2));
             }
             // check if we can seek in buffer
             if (_seekPositionRequested >= min_pos && _seekPositionRequested <= max_pos) {

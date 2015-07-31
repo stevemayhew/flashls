@@ -123,7 +123,7 @@ package org.mangui.hls {
          *
          * Default is true
          */
-        public static var smoothAutoSwitchonFPSDrop : Boolean = true;
+        public static var smoothAutoSwitchonFPSDrop : Boolean = false;
 
         /**
          * seekMode
@@ -273,7 +273,7 @@ package org.mangui.hls {
          *
          * Default is false
          */
-        public static var useHardwareVideoDecoder : Boolean = false;
+        public static var useHardwareVideoDecoder : Boolean = true;
 
         /** Log function to log to the Browser console, default is "console.log"
          *  NULL or empty string will log only to the flashlog.

@@ -237,7 +237,7 @@ package org.mangui.hls.controller {
              */
             if ((current_level < max_level) && (sftm > (1 + _switchup[current_level]))) {
                 CONFIG::LOGGING {
-                    Log.debug("sftm:> 1+_switchup[_level]=" + (1 + _switchup[current_level]));
+                    Log.info("sftm:> 1+_switchup[_level]=" + (1 + _switchup[current_level]));
                 }
                 switch_to_level = current_level + 1;
             }
@@ -247,7 +247,7 @@ package org.mangui.hls.controller {
             or the current level is greater than max level
              */ else if ((current_level > max_level && current_level > 0) || (current_level > 0 && (sftm < 1 - _switchdown[current_level]))) {
                 CONFIG::LOGGING {
-                    Log.debug("sftm < 1-_switchdown[current_level]=" + _switchdown[current_level]);
+                    Log.info("sftm < 1-_switchdown[current_level]=" + _switchdown[current_level]);
                 }
                 var bufferratio : Number = 1000 * buffer / _lastSegmentDuration;
                 /* find suitable level matching current bandwidth, starting from current level
@@ -272,7 +272,7 @@ package org.mangui.hls.controller {
 
             CONFIG::LOGGING {
                 if (switch_to_level != current_level) {
-                    Log.debug("switch to level " + switch_to_level);
+                    Log.info("getNextLevel(" + current_level + ") returns: " + switch_to_level);
                 }
             }
 
