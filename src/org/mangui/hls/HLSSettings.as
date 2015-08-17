@@ -108,7 +108,7 @@ package org.mangui.hls {
          *
          * Default is true
          */
-        public static var capLevelonFPSDrop : Boolean = true;
+        public static var capLevelonFPSDrop : Boolean = false;
 
         /**
          * smoothAutoSwitchonFPSDrop
