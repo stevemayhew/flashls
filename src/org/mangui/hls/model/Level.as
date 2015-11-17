@@ -76,6 +76,7 @@ package org.mangui.hls.model {
             if(id < urls.length && id != _redundantStreamId) {
                 _redundantStreamId = id;
                 fragments = new Vector.<Fragment>();
+                start_seqnum = end_seqnum = NaN;
             }
         }
 
@@ -94,16 +95,23 @@ package org.mangui.hls.model {
             return fragments[len - 1];
         };
 
-        /** Return the sequence number from a given program date **/
-        public function getSeqNumFromProgramDate(program_date : Number) : int {
+        /** Return the sequence number nearest a given program date **/
+        public function getSeqNumNearestProgramDate(program_date : Number) : int {
             if (program_date < fragments[0].program_date)
                 return -1;
 
             var len : int = fragments.length;
-            for (var i : int = 0; i < len; i++) {
-                /* check whether fragment contains current position */
-                if (fragments[i].data.valid && fragments[i].program_date <= program_date && fragments[i].program_date + 1000 * fragments[i].duration > program_date) {
-                    return (start_seqnum + i);
+            if(len) {
+                if (program_date > (fragments[len-1].program_date + 1000*fragments[len-1].duration))
+                    return -1;
+
+                for (var i : int = 0; i < len; i++) {
+                    var frag : Fragment = fragments[i];
+                    /* check whether fragment contains current position */
+                    if (frag.data.valid &&
+                        Math.abs(frag.program_date - program_date) < Math.abs(frag.program_date + 1000 * frag.duration - program_date)) {
+                        return frag.seqnum;
+                    }
                 }
             }
             return -1;
