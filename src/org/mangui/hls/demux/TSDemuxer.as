@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package org.mangui.hls.demux {
-    import flash.events.Event;
+
+import flash.errors.EOFError;
+import flash.events.Event;
     import flash.events.EventDispatcher;
     import flash.events.TimerEvent;
     import flash.net.ObjectEncoding;
@@ -524,13 +526,17 @@ package org.mangui.hls.demux {
                     if (payload_type == 4)
                     {
                         var payload_size : uint = 0;
+                        var country_code : uint = 0;
+                        try {
 
-                        do {
-                            payload_size = pes.data.readUnsignedByte();
+                        } catch (e:EOFError) {
+                            do {
+                                payload_size = pes.data.readUnsignedByte();
+                            }
+                            while(payload_size === 255);
+
+                            country_code = pes.data.readUnsignedByte();
                         }
-                        while(payload_size === 255)
-
-                        var country_code : uint = pes.data.readUnsignedByte();
 
                         if (country_code == 181)
                         {
