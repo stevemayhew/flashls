@@ -528,14 +528,16 @@ import flash.events.Event;
                         var payload_size : uint = 0;
                         var country_code : uint = 0;
                         try {
-
-                        } catch (e:EOFError) {
                             do {
                                 payload_size = pes.data.readUnsignedByte();
                             }
                             while(payload_size === 255);
 
                             country_code = pes.data.readUnsignedByte();
+                        } catch (e:EOFError) {
+                            CONFIG::LOGGING {
+                                Log.info("EOFError type=" + payload_type + " pes.payload_len: " + pes.payload_len + "  pts/dts:" + pes.pts + "/" + pes.dts);
+                            }
                         }
 
                         if (country_code == 181)
@@ -616,6 +618,11 @@ import flash.events.Event;
                                         }
                                     }
                                 }
+                            }
+                        }
+                        else {
+                            CONFIG::LOGGING {
+                                Log.info("not enough bytes in frame!");
                             }
                         }
                     }
