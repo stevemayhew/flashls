@@ -46,7 +46,9 @@
   <component name="DependencyValidationManager">
     <option name="SKIP_IMPORT_STATEMENTS" value="false" />
   </component>
-  <component name="Encoding" useUTFGuessing="true" native2AsciiForPropertiesFiles="false" />
+  <component name="Encoding" useUTFGuessing="true" native2AsciiForPropertiesFiles="false">
+    <file url="PROJECT" charset="UTF-8" />
+  </component>
   <component name="IdProvider" IDEtalkID="143AD22C442B22E33F68EEECE99A927A" />
   <component name="JavadocGenerationManager">
     <option name="OUTPUT_DIRECTORY" />
