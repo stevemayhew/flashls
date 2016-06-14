@@ -232,7 +232,7 @@ package org.mangui.hls {
          *
          * Default is 4000
          */
-        public static var fragmentLoadMaxRetryTimeout : Number = 4000
+        public static var fragmentLoadMaxRetryTimeout : Number = 4000;
 
         /**
          * fragmentLoadSkipAfterMaxRetry
@@ -244,6 +244,17 @@ package org.mangui.hls {
          * Default is true.
          */
         public static var fragmentLoadSkipAfterMaxRetry : Boolean = true;
+
+        /**
+         * maxSkippedFragments
+         *
+         * Maximum count of skipped fragments in a row before an I/O Error will be raised.
+         *      0 - no skip (same as fragmentLoadSkipAfterMaxRetry = false)
+         *      -1 - no limit for skipping, skip till the end of the playlist 
+         *
+         * Default is 5.
+         */
+        public static var maxSkippedFragments : int = 5;
 
         /**
          * flushLiveURLCache
@@ -262,7 +273,7 @@ package org.mangui.hls {
          *
          * Default is 1
          */
-        public static var initialLiveManifestSize: uint = 1;
+        public static var initialLiveManifestSize : uint = 1;
 
         /**
          * manifestLoadMaxRetry
@@ -286,14 +297,13 @@ package org.mangui.hls {
 
 		/**
 		 * manifestRedundantLoadmaxRetry
-		 * 
+		 *
 		 * max nb of looping over the redundant streams.
 		 *   >0  means looping over the stream array 2 or more times
 		 *    0  means looping exactly once (no retries) - default behaviour
 		 *   -1  means infinite retry
 		 */
-		public static var manifestRedundantLoadmaxRetry : int = 3;
-			
+         public static var manifestRedundantLoadmaxRetry : int = 3;
         /**
          * startFromBitrate
          *

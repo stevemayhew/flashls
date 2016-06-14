@@ -182,7 +182,7 @@ import flash.events.Event;
         }
 
         private function getNextTSBuffer(start : int) : ByteArray {
-            if(start + 188 <= _totalBytes) {
+            if(_dataVector && start + 188 <= _totalBytes) {
                 // find element matching with start offset
                 for(var i : int = 0, offset : int = _dataOffset; i < _dataVector.length; i++) {
                     var buffer : ByteArray = _dataVector[i], bufferLength : int = buffer.length;
@@ -219,9 +219,101 @@ import flash.events.Event;
             return null;
         }
 
+		//Read CC track
+		private function readCC(pes : PES):void
+		{
+			var country_code : uint = pes.data.readUnsignedByte();
+
+			if (country_code == 181)
+			{
+				var provider_code : uint = pes.data.readUnsignedShort();
+
+				if (provider_code == 49)
+				{
+					var user_structure : uint = pes.data.readUnsignedInt();
+
+					if (user_structure == 0x47413934) // GA94
+					{
+						var user_data_type : uint = pes.data.readUnsignedByte();
+
+						// CEA-608 wrapped in 708 ( user_data_type == 4 is raw 608, not handled yet )
+						if (user_data_type == 3)
+						{
+							// cc -- the first 8 bits are 1-Boolean-0 and the 5 bits for the number of CCs
+							var byte:uint = pes.data.readUnsignedByte();
+
+							// get the total number of cc_datas
+							var total:uint = 31 & byte;
+							var count:uint = 0;
+
+							// supposedly a flag to process the cc_datas or not
+							// isn't working for me, so i don't use it yet
+							var process:Boolean = !((64 & byte) == 0);
+
+							var size:uint = total * 3;
+
+							// em_data, do we need? It's not used for anything, but it's there, so i need to pull it out
+							var otherByte:uint = pes.data.readUnsignedByte();
+
+							if (pes.data.bytesAvailable >= size)
+							{
+								// ByteArray for onCaptionInfo event
+								var sei : ByteArray = new ByteArray();
+
+								// onCaptionInfo payloads need to know the size of the binary data
+								// there's two two bytes we just read, plus the cc_datas, which are 3 bytes each
+								sei.writeUnsignedInt(2+3*total);
+
+								// write those two bytes
+								sei.writeByte(byte);
+								sei.writeByte(otherByte);
+
+								// write the cc_datas
+								pes.data.readBytes(sei, 6, 3*total);
+
+								pes.data.position -= total * 3;
+
+								// onCaptionInfo expects Base64 data...
+								var sei_data:String = Base64.encode(sei);
+
+								var cc_data:Object = {
+									type: "708",
+									data: sei_data
+								};
+
+								// add a new FLVTag with the onCaptionInfo call
+								var tag:FLVTag = new FLVTag(FLVTag.METADATA, pes.pts, pes.pts, false);
+
+								var data : ByteArray = new ByteArray();
+								data.objectEncoding = ObjectEncoding.AMF0;
+								data.writeObject("onCaptionInfo");
+								data.objectEncoding = ObjectEncoding.AMF3;
+								data.writeByte(0x11);
+								data.writeObject(cc_data);
+								tag.push(data, 0, data.length);
+								tag.build();
+								_tags.push(tag);
+							}
+							else
+							{
+								CONFIG::LOGGING {
+									Log.warn("not enough bytes to extract caption!");
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
         /** Parse a limited amount of packets each time to avoid blocking **/
         private function _parseTimer(e : Event) : void {
             var start_time : int = getTimer();
+            // if any tags left,
+            if (_tags.length) {
+                _callback_progress(_tags);
+                _tags = new Vector.<FLVTag>();
+            }
             /** Byte data to be read **/
             var data : ByteArray = getNextTSBuffer(_readPosition);
             // dont spend more than 10ms demuxing TS packets to avoid loosing frames
@@ -233,23 +325,29 @@ import flash.events.Event;
                     data = getNextTSBuffer(_readPosition);
                 }
             }
-            if (_tags.length) {
-                _callback_progress(_tags);
-                _tags = new Vector.<FLVTag>();
-            }
-            // check if we have finished with reading this TS fragment
-            if (_dataComplete && _readPosition == _totalBytes) {
-                // free ByteArray
-                _dataVector = null;
-                // first check if TS parsing was successful
-                CONFIG::LOGGING {
-                    if (_pmtParsed == false) {
-                        Log.error("TS: no PMT found, report parsing complete");
+            // if we have spare time
+            if((getTimer() - start_time) < 10) {
+                if (_tags.length) {
+                    _callback_progress(_tags);
+                    _tags = new Vector.<FLVTag>();
+                }
+                // if we have spare time
+                if((getTimer() - start_time) < 10) {
+                    // check if we have finished with reading this TS fragment
+                    if (_dataComplete && _readPosition == _totalBytes) {
+                        // free ByteArray
+                        _dataVector = null;
+                        // first check if TS parsing was successful
+                        CONFIG::LOGGING {
+                            if (_pmtParsed == false) {
+                                Log.error("TS: no PMT found, report parsing complete");
+                            }
+                        }
+                        _timer.stop();
+                        _flush();
+                        _callback_complete();
                     }
                 }
-                _timer.stop();
-                _flush();
-                _callback_complete();
             }
         }
 
@@ -517,114 +615,42 @@ import flash.events.Event;
                     ppsvect.push(pps);
                 } else if (frame.type == 6) {
 
-                    // We already know it's 6, so skip first byte
-                    pes.data.position = frame.start + 1;
+					//unescape Emulation Prevention bytes
+					Nalu.unescapeStream(pes.data,frame.start,frame.start + frame.length);
 
-                    // get the SEI payload type
-                    var payload_type : uint = pes.data.readUnsignedByte();
+					// We already know it's 6, so skip first byte
+					pes.data.position = frame.start + 1;
 
-                    if (payload_type == 4)
-                    {
-                        var payload_size : uint = 0;
-                        var country_code : uint = 0;
-                        try {
-                            do {
-                                payload_size = pes.data.readUnsignedByte();
-                            }
-                            while(payload_size === 255);
+					// we need at least 12 bytes to retrieve Caption length
+					if(pes.data.bytesAvailable > 12) {
 
-                            country_code = pes.data.readUnsignedByte();
-                        } catch (e:EOFError) {
-                            CONFIG::LOGGING {
-                                Log.info("EOFError type=" + payload_type + " pes.payload_len: " + pes.payload_len + "  pts/dts:" + pes.pts + "/" + pes.dts);
-                            }
-                        }
-
-                        if (country_code == 181)
-                        {
-                            var provider_code : uint = pes.data.readUnsignedShort();
-
-                            if (provider_code == 49)
-                            {
-                                var user_structure : uint = pes.data.readUnsignedInt();
-
-                                if (user_structure == 0x47413934) // GA94
-                                {
-                                    var user_data_type : uint = pes.data.readUnsignedByte();
-
-                                    // CEA-608 wrapped in 708 ( user_data_type == 4 is raw 608, not handled yet )
-                                    if (user_data_type == 3)
-                                    {
-                                        // cc -- the first 8 bits are 1-Boolean-0 and the 5 bits for the number of CCs
-                                        var byte:uint = pes.data.readUnsignedByte();
-
-                                        // get the total number of cc_datas
-                                        var total:uint = 31 & byte;
-                                        var count:uint = 0;
-
-                                        // supposedly a flag to process the cc_datas or not
-                                        // isn't working for me, so i don't use it yet
-                                        var process:Boolean = !((64 & byte) == 0);
-
-                                        var size:uint = total * 3;
-
-                                        // em_data, do we need? It's not used for anything, but it's there, so i need to pull it out
-                                        var otherByte:uint = pes.data.readUnsignedByte();
-
-                                        if (pes.data.bytesAvailable >= size)
-                                        {
-                                            // ByteArray for onCaptionInfo event
-                                            var sei : ByteArray = new ByteArray();
-
-                                            // onCaptionInfo payloads need to know the size of the binary data
-                                            // there's two two bytes we just read, plus the cc_datas, which are 3 bytes each
-                                            sei.writeUnsignedInt(2+3*total);
-
-                                            // write those two bytes
-                                            sei.writeByte(byte);
-                                            sei.writeByte(otherByte);
-
-                                            // write the cc_datas
-                                            pes.data.readBytes(sei, 6, 3*total);
-
-                                            pes.data.position -= total * 3;
-
-                                            // onCaptionInfo expects Base64 data...
-                                            var sei_data:String = Base64.encode(sei);
-
-                                            var cc_data:Object = {
-                                                type: "708",
-                                                data: sei_data
-                                            };
-
-                                            // add a new FLVTag with the onCaptionInfo call
-                                            var tag:FLVTag = new FLVTag(FLVTag.METADATA, pes.pts, pes.pts, false);
-
-                                            var data : ByteArray = new ByteArray();
-                                            data.objectEncoding = ObjectEncoding.AMF0;
-                                            data.writeObject("onCaptionInfo");
-                                            data.objectEncoding = ObjectEncoding.AMF3;
-                                            data.writeByte(0x11);
-                                            data.writeObject(cc_data);
-                                            tag.push(data, 0, data.length);
-                                            tag.build();
-                                            _tags.push(tag);
-                                        }
-                                        else
-                                        {
-                                            CONFIG::LOGGING {
-                                                Log.info("not enough bytes!");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        else {
-                            CONFIG::LOGGING {
-                                Log.info("not enough bytes in frame!");
-                            }
-                        }
+						// get the SEI payload type
+						var payload_type : uint = 0;
+						var payload_size : uint = 0;
+						while (pes.data.position < frame.start + frame.length) {
+							// Parse payload type.
+							payload_type= 0;
+							do {
+								payload_type += pes.data.readUnsignedByte();
+							} while (payload_type == 0xFF);
+							// Parse payload size.
+							payload_size = 0;
+							do {
+								payload_size += pes.data.readUnsignedByte();
+							} while (pes.data.bytesAvailable!=0 && payload_size == 0xFF);
+							// Process the payload. We only support EIA-608 payloads currently.
+							if (payload_type == 4) {
+								readCC(pes);
+							} else {
+								pes.data.position+=payload_size;
+							}
+						}
+					}
+                } else if (frame.type == 0) {
+                    // report parsing error
+                    if(_callback_error != null) {
+                        _callback_error("TS: invalid NALu type found, corrupted fragment ?");
+                        return;
                     }
                 }
             }
@@ -632,12 +658,14 @@ import flash.events.Event;
             if (sps_found && pps_found) {
                 var avcc : ByteArray = AVCC.getAVCC(sps, ppsvect);
                 // only push AVCC tag if never pushed or avcc different from previous one
-                _avcc = avcc;
-                var avccTag : FLVTag = new FLVTag(FLVTag.AVC_HEADER, pes.pts, pes.dts, true);
-                avccTag.push(avcc, 0, avcc.length);
-                avccTag.build();
-                // Log.debug("TS:AVC:push AVC HEADER");
-                _tags.push(avccTag);
+                if (_avcc == null || !compareByteArray(_avcc, avcc)) {
+                    _avcc = avcc;
+                    var avccTag : FLVTag = new FLVTag(FLVTag.AVC_HEADER, pes.pts, pes.dts, true);
+                    avccTag.push(avcc, 0, avcc.length);
+                    avccTag.build();
+                    // Log.debug("TS:AVC:push AVC HEADER");
+                    _tags.push(avccTag);
+                }
             }
 
             /*
@@ -687,6 +715,26 @@ import flash.events.Event;
                     }
                 }
             }
+        }
+
+        // return true if same Byte Array
+        private function compareByteArray(ba1 : ByteArray, ba2 : ByteArray) : Boolean {
+            // compare the lengths
+            var size : uint = ba1.length;
+            if (ba1.length == ba2.length) {
+                ba1.position = 0;
+                ba2.position = 0;
+
+                // then the bytes
+                while (ba1.position < size) {
+                    var v1 : int = ba1.readByte();
+                    if (v1 != ba2.readByte()) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
         }
 
         /** parse ID3 PES packet **/
@@ -798,21 +846,22 @@ import flash.events.Event;
                                 Log.warn("TS: reparsing PMT, unknown PID found");
                             }
                         }
-                        todo -= _parsePMT(stt,data);
-                        // if PMT was not parsed before, and some unknown packets have been skipped in between,
-                        // rewind to beginning of the stream, it helps recovering bad segmented content
-                        // in theory there should be no A/V packets before PAT/PMT)
-                        if (_pmtParsed == false && _unknownPIDFound == true) {
-                            CONFIG::LOGGING {
-                                Log.warn("TS: late PMT found, rewinding at beginning of TS");
-                            }
-                            _pmtParsed = true;
-                            _readPosition = 0;
-                            return;
+                    }
+                    // always reparse PMT
+                    todo -= _parsePMT(stt,data);
+                    // if PMT was not parsed before, and some unknown packets have been skipped in between,
+                    // rewind to beginning of the stream, it helps recovering bad segmented content
+                    // in theory there should be no A/V packets before PAT/PMT)
+                    if (_pmtParsed == false && _unknownPIDFound == true) {
+                        CONFIG::LOGGING {
+                            Log.warn("TS: late PMT found, rewinding at beginning of TS");
                         }
                         _pmtParsed = true;
-                        _unknownPIDFound = false;
+                        _readPosition = 0;
+                        return;
                     }
+                    _pmtParsed = true;
+                    _unknownPIDFound = false;
                     break;
                 case _audioId:
                     if (_pmtParsed == false) {
@@ -966,9 +1015,11 @@ import flash.events.Event;
                 } else if (typ == 0x1B) {
                     // ITU-T Rec. H.264 and ISO/IEC 14496-10 (lower bit-rate video)
                     if(_audioOnly == false) {
-                        _avcId = sid;
-                        CONFIG::LOGGING {
-                            Log.debug("TS: Selected video PID: " + _avcId);
+                        if(_avcId != sid) {
+                            _avcId = sid;
+                            CONFIG::LOGGING {
+                                Log.debug("TS: Selected video PID: " + _avcId);
+                            }
                         }
                     } else {
                         CONFIG::LOGGING {
@@ -981,9 +1032,11 @@ import flash.events.Event;
                     audioList.push(new AudioTrack('TS/MP3 ' + audioList.length, AudioTrack.FROM_DEMUX, sid, (audioList.length == 0), false));
                 } else if (typ == 0x15) {
                     // ID3 pid
-                    _id3Id = sid;
-                    CONFIG::LOGGING {
-                        Log.debug("TS: Selected ID3 PID: " + _id3Id);
+                    if(_id3Id != sid) {
+                        _id3Id = sid;
+                        CONFIG::LOGGING {
+                            Log.debug("TS: Selected ID3 PID: " + _id3Id);
+                        }
                     }
                 }
                 // es_info_length
@@ -993,34 +1046,37 @@ import flash.events.Event;
                 read += sel + 5;
             }
 
-            CONFIG::LOGGING {
-                if (audioList.length) {
-                    Log.debug("TS: Found " + audioList.length + " audio tracks");
-                }
-            }
             // provide audio track List to audio select callback. this callback will return the selected audio track
             var audioPID : int;
-            _audioFound = (audioList.length > 0);
-            var audioTrack : AudioTrack = _callback_audioselect(audioList);
-            if (audioTrack) {
-                audioPID = audioTrack.id;
-                _audioIsAAC = audioTrack.isAAC;
-                _audioSelected = true;
+            var audioFound : Boolean = (audioList.length > 0);
+            if (audioFound != _audioFound) {
                 CONFIG::LOGGING {
-                    Log.debug("TS: selected " + (_audioIsAAC ? "AAC" : "MP3") + " PID: " + audioPID);
+                    if (audioFound) {
+                        Log.debug("TS: Found " + audioList.length + " audio tracks");
+                    }
                 }
-            } else {
-                audioPID = -1;
-                _audioSelected = false;
-                CONFIG::LOGGING {
-                    Log.debug("TS: no audio selected");
+                _audioFound = audioFound;
+                var audioTrack : AudioTrack = _callback_audioselect(audioList);
+                if (audioTrack) {
+                    audioPID = audioTrack.id;
+                    _audioIsAAC = audioTrack.isAAC;
+                    _audioSelected = true;
+                    CONFIG::LOGGING {
+                        Log.debug("TS: selected " + (_audioIsAAC ? "AAC" : "MP3") + " PID: " + audioPID);
+                    }
+                } else {
+                    audioPID = -1;
+                    _audioSelected = false;
+                    CONFIG::LOGGING {
+                        Log.debug("TS: no audio selected");
+                    }
                 }
-            }
-            // in case audio PID change, flush any partially parsed audio PES packet
-            if (audioPID != _audioId) {
-                _curAudioPES = null;
-                _adtsFrameOverflow = null;
-                _audioId = audioPID;
+                // in case audio PID change, flush any partially parsed audio PES packet
+                if (audioPID != _audioId) {
+                    _curAudioPES = null;
+                    _adtsFrameOverflow = null;
+                    _audioId = audioPID;
+                }
             }
             return len + pointerField;
         };
