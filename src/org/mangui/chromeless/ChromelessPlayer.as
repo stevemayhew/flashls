@@ -207,6 +207,8 @@ package org.mangui.chromeless {
             if (videoWidth && videoHeight) {
                 var changed : Boolean = _videoWidth != videoWidth || _videoHeight != videoHeight;
                 if (changed) {
+                    Log.info("media size change, w/h "+ videoWidth + "/" + videoHeight);
+
                     _videoHeight = videoHeight;
                     _videoWidth = videoWidth;
                     _resize();
@@ -522,11 +524,14 @@ package org.mangui.chromeless {
             _hls.addEventListener(HLSEvent.FPS_DROP_SMOOTH_LEVEL_SWITCH, _fpsDropSmoothLevelSwitchHandler);
 
             if (available && stage.stageVideos.length > 0) {
+                Log.info("Using StageVideo, stage w/h "+ stage.stageWidth + "/" +stage.stageHeight);
                 _stageVideo = stage.stageVideos[0];
                 _stageVideo.addEventListener(StageVideoEvent.RENDER_STATE, _onStageVideoStateChange)
                 _stageVideo.viewPort = new Rectangle(0, 0, stage.stageWidth, stage.stageHeight);
                 _stageVideo.attachNetStream(_hls.stream);
             } else {
+                Log.info("Using Video, stage w/h "+ stage.stageWidth + "/" +stage.stageHeight);
+
                 _video = new Video(stage.stageWidth, stage.stageHeight);
                 _video.addEventListener(VideoEvent.RENDER_STATE, _onVideoStateChange);
                 addChild(_video);

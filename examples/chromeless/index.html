@@ -43,10 +43,10 @@ header {
 }
 .center
 {
-    width: 70%;
-    min-width: 615px;
+    /*width: 70%;*/
+    /*min-width: 615px;*/
     overflow: hidden;
-    margin-left: auto;
+    margin-left: 10px;
     margin-right: auto;
     display: block
 }
@@ -54,6 +54,7 @@ header {
 button[disabled] {
     color: gainsboro;
 }
+
 
 #customButtons input { width: 25%; display : inline-block; text-align: center; font-size: 8pt;}
 #toggleButtons button { width: 12%; display : inline-block; text-align: center; font-size: 8pt; background-color: #A0A0A0 }
@@ -107,8 +108,9 @@ button[disabled] {
     </header>
     <div id="controls">
         <div id="customButtons">
-            <lable>TCD IP:</lable><input type="text" value="10.100.51.25" id="tcdAddr">
-            <lable>Transcodre IP:</lable><input type="text" value="10.100.51.66" id="xcodeAddr">
+            <label>TCD IP:</label><input type="text" value="10.100.51.212" id="tcdAddr">
+            <label>Transcoder IP:</label><input type="text" value="10.100.50.244" id="xcodeAddr">
+            <label>FSID:</label><input type="text" value="2" id="fsid">
             <button type="button" id="loadShows">Load Shows</button>
             <button type="button" id="startSession">Start Session</button>
 
@@ -123,24 +125,24 @@ button[disabled] {
 
     <div class="center" id="video">
         <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
-         codebase="" id="moviename" width="720" height="480">
+         codebase="" id="moviename">
         <param name="movie"  value="../../bin/debug/flashlsChromeless.swf?inline=1" />
         <param name="quality" value="autohigh" />
         <param name="swliveconnect" value="true" />
         <param name="allowScriptAccess" value="sameDomain" />
         <param name="bgcolor" value="#0" />
         <param name="allowFullScreen" value="true" />
-        <param name="wmode" value="window" />
+        <param name="direct" value="window" />
         <param name="FlashVars" value="callback=flashlsCallback" />
 
-        <embed src="../../bin/debug/flashlsChromeless.swf?inline=1" width="720" height="480" name="moviename"
+        <embed src="../../bin/debug/flashlsChromeless.swf?inline=1" width="960" height="540" name="moviename"
                     quality="autohigh"
                     bgcolor="#0"
                     align="middle" allowFullScreen="true"
                     allowScriptAccess="sameDomain"
                     type="application/x-shockwave-flash"
                     swliveconnect="true"
-                    wmode="window"
+                    wmode="direct"
                     FlashVars="callback=flashlsCallback"
                     pluginspage="http://www.macromedia.com/go/getflashplayer" >
         </embed>
@@ -393,34 +395,48 @@ $(document).ready(function() {
 
     $('#startSession').click(function() {
         $('#streamURL').val("");
-        $()
+        var fsid = $("#fsid").val();
         var xcodeAddr = $('#xcodeAddr').val();
         var recording = $('#streamSelect').val();
-        if (recording) {
+
+        bodyId = bodyId || "8F00000001EE678";
+//        bodyId = bodyId || "8D000019032A848";
+
+        function startSession(mfsId) {
+            var startSess = $.ajax('http://' + xcodeAddr + ':49152/sysinfo/control', {
+                data: {
+                    config: 'session',
+                    action: 'acquire',
+                    tsn: bodyId,
+                    fsid: mfsId,
+                    xkey: 'hls',
+                    ifver: 1
+                },
+                global: false,          // Needed to avoid headers that cause the CORS logic to attempt an OPTIONS request.
+                dataType: 'json'        // Stream lies, says it's text/html
+            });
+
+            startSess.done(function(data, statusText, jqXhr) {
+                var url = 'http://' + xcodeAddr + ':49152/session-streaming/' + data.contextid + '.m3u8';
+
+                $('#streamURL').val(url);
+                console.log("session: " + url)
+            });
+
+            startSess.fail(function(data, statusText, jqXhr) {
+                console.log(data, statusText, jqXhr)
+            })
+
+        }
+
+        if (fsid) {
+            startSession(fsid);
+        } else if (recording) {
             objectSearch.objectId = recording;
 
             mindRpc.request(objectSearch, function(objectResult) {
                 var mfsId = objectResult.objectId[0].split('.')[1];  // Just the number part.
-
-                var startSess = $.ajax('http://' + xcodeAddr + ':49152/sysinfo/control', {
-                    data: {
-                        config: 'session',
-                        action: 'acquire',
-                        tsn: bodyId,
-                        fsid: mfsId,
-                        xkey: 'hls',
-                        ifver: 1
-                    },
-                    global: false,          // Needed to avoid headers that cause the CORS logic to attempt an OPTIONS request.
-                    dataType: 'json'        // Stream lies, says it's text/html
-                });
-
-                startSess.done(function (data, statusText, jqXhr) {
-                    var url = 'http://' +  xcodeAddr + ':49152/session-streaming/' + data.contextid + '.m3u8';
-
-                    $('#streamURL').val(url);
-                    console.log("session: " + url)
-                })
+                startSession(mfsId);
             });
         }
     })
@@ -530,15 +546,15 @@ var flashlsEvents = {
     var event = {time : new Date() - jsLoadDate, type : "resize", name : width + 'x' + height};
     events.video.push(event);
     $("#currentResolution").html("video resolution:" + width + 'x' + height);
-    var ratio = width / height;
-    if (width > $('#video').innerWidth()-30) {
-        width = $('#video').innerWidth()-30;
-        height = Math.round(width / ratio);
-    }
-   api.flashObject.width = width;
-   api.flashObject.height = height;
-   var canvas = $('#buffered_c')[0];
-   canvas.width = width;
+//    var ratio = width / height;
+//    if (width > $('#video').innerWidth()-30) {
+//        width = $('#video').innerWidth()-30;
+//        height = Math.round(width / ratio);
+//    }
+//   api.flashObject.width = width;
+//   api.flashObject.height = height;
+//   var canvas = $('#buffered_c')[0];
+//   canvas.width = width;
   },
   complete: function() {
     appendLog("onComplete(), playback completed");

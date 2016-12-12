@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Native (for Safari) HLS Video Player Test Page</title>
+
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/jquery-ui.js"></script>
+    <!-- 
+    <script type="text/javascript" src="//cdn.jsdelivr.net/modernizr/2.8.3/modernizr.js"></script>
+	-->
+
+    <script type="text/javascript" src="xml2json.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .descriptive-text {
+            margin: 0.5em 0 0.2em 0.3em;
+        }
+
+        fieldset.input-group-plain {
+            border: none;
+        }
+
+        .section-label {
+            margin-bottom: .2em;
+        }
+
+
+        .video-container {
+            float: left;
+        }
+        input[name="streamUrl"] { width: 45em; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+      <label>TCD TSN:</label><input type="text" value="8F00000001EE678" id="tcdTSN">
+      <label>TCD IP:</label><input type="text" value="172.16.1.6" id="tcdAddr">
+      <label>Transcoder IP:</label><input type="text" value="172.16.1.11" id="xcodeAddr">
+      <label>MAK:</label><input type="text" value="8446597272" id="MAK">
+      <button type="button" id="loadShows">Load Shows</button>
+      <br>
+      <select id="streamSelect" class="innerControls"><option value="" selected>(Enter custom URL below)</option></select>
+      <input id="streamURL" class="innerControlsLeft" type=text value=""/>
+      <br>
+      <button type="button" id="startSession">Acquire Session</button>
+      <button type="button" id="stopSession">Release Session</button>
+      <br>
+    </div>
+
+	<div id="player"></div>
+	<video  width="720" height="480" loop controls autoplay id="videoPlayer">
+  		<source src="" type="application/x-mpegURL" id="videoUrl">
+	</video>
+	<script type="text/javascript">
+$(document).ready(function() {
+    console.log("ready()");
+    $('button').attr('disabled', false);
+    $('#streamURL').change(function()           { loadStream($('#streamURL').val());});
+    $('#tcdAddr').change( loadShows );
+    $('#tcdTSN').change( loadShows );
+    $('#loadShows').click(loadShows);
+    $('#startSession').on( "click", ( startSession ) )
+    $('#stopSession').on( "click", ( stopSession ) )
+
+    loadShows();
+
+    var contextID=0
+
+    function loadStream(url) {
+        console.log("load()");
+    	$("#videoPlayer").find("#videoUrl").attr("src", url)
+    	$("#videoPlayer").load();
+    }
+    
+    function unloadStream(url) {
+        console.log("unload()");
+    	$("#videoPlayer").stop();
+    	$("#videoPlayer").find("#videoUrl").attr("src", "")
+    	$("#videoPlayer").load();
+    }
+
+    function TTGRequest( tcdAddr, mak, listener ) {
+        console.log("start request mdo->")
+
+        //var startRequest = $.ajax('https://'+tcdAddr+'/TiVoConnect?Command=QueryContainer&Container=\/NowPlaying&Recurse=Yes', {
+        var startRequest = $.ajax('/Proxy?user=tivo&password='+$('#MAK').val()+'&uri='+encodeURIComponent( 'https://'+tcdAddr+'/TiVoConnect?Command=QueryContainer&Container=\/NowPlaying&Recurse=Yes'), {
+            type: 'GET',
+            success: function (data, textStatus, jqXHR) {
+                var mdo;
+                console.log("success->"+textStatus)
+                console.log("success->"+data)
+                console.log("success->"+jqXHR.responseText)
+                try {
+                    mdo = $.xml2json(jqXHR.responseText );                    
+                    // = $.parseXML( jqXHR.responseText );
+                    console.log("success -> mod="+mdo)
+                } catch (e) {
+                    console.log("Unparseable XML/JSON body : "+ jqXHR.responseText );
+                }
+                console.log("try and return mdo...")
+                //alert( "Data Loaded: " + data );
+                listener( mdo );
+            },
+
+            error: function (request, status, error) {
+               console.log("error..."+status)
+               console.log("error..."+error)
+               console.log("error..."+request.responseText)
+               alert(request.responseText);
+            },
+          
+        })
+        
+        return;
+    }
+
+    function getParameterByName(name, url) {
+      if (!url) url = window.location.href;
+      name = name.replace(/[\[\]]/g, "\\$&");
+      var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+      if (!results) return null;
+      if (!results[2]) return '';
+      return decodeURIComponent(results[2].replace(/\+/g, " "));
+    }
+    
+    function loadMyShows() {
+        console.log("loadMyShows()");
+        
+        TTGRequest( $('#tcdAddr').val(), $('#MAK').val(), function(response) {
+            console.log("loadMyShows( finished )");
+            console.log(response);
+            $('#loadShows').attr("disabled", false);
+
+             
+            console.log(response.TiVoContainer.ItemCount);
+
+            console.log(response.TiVoContainer.Item);
+
+
+            var titleAndRecording = $.map( response.TiVoContainer.Item, function(val) {
+                //console.log(val.Details);
+                console.log(val.Details.Title);                
+                console.log(val.Links.Content.Url);
+                var id=getParameterByName("id", val.Links.Content.Url)
+                console.log(id);
+
+                var show = val.Details.EpisodeTitle ? val.Details.Title + "("+val.Details.EpisodeTitle+")" : val.Details.Title;
+                return { title: show, myShowsItemId: id };
+            });
+
+            var sorted = titleAndRecording.sort(function(a, b) {
+                return a.title.localeCompare(b.title);
+            });
+
+
+            $('#streamSelect').empty();
+            $.each(sorted, function() {
+                var $option = $('<option>').text(this.title);
+                $option.attr('value', this.myShowsItemId);
+                $('#streamSelect').append($option);
+            });
+            $('#streamSelect').change( startSession );
+
+        });
+    }
+
+    function loadShows() {
+        console.log("loadShows()")
+        $('#loadShows').attr("disabled", "disabled");
+        loadMyShows()
+    }
+        
+
+    var objectSearch = {namespace: "mfs", type: "idSearch" };
+
+    
+    function startSession() {
+        console.log("startSession()")
+
+        stopSession()
+        $('#streamURL').val("");
+        $()
+        var xcodeAddr = $('#xcodeAddr').val();
+        var recording = $('#streamSelect').val();
+
+        console.log(recording)
+        if (recording) {
+                var startSess = $.ajax('http://' + xcodeAddr + ':49152/sysinfo/control', {
+                    data: {
+                        config: 'session',
+                        action: 'acquire',
+                        tsn: $('#tcdTSN').val(),
+                        fsid: recording,
+                        xkey: 'hls',
+                        ifver: 1
+                    },
+                    global: false,          // Needed to avoid headers that cause the CORS logic to attempt an OPTIONS request.
+                    dataType: 'json'        // Stream lies, says it's text/html
+                });
+
+                startSess.done(function (data, statusText, jqXhr) {
+                	contextID=data.contextid
+                	
+                    var url = 'http://' +  xcodeAddr + ':49152/session-streaming/' + data.contextid + '.m3u8';
+
+                    $('#streamURL').val(url);
+                    console.log("session: " + url)
+                    loadStream(url)
+                });
+        }
+    }
+
+    function stopSession() {
+        console.log("releaseSession("+contextID+")")
+
+        if (contextID) {
+            var xcodeAddr = $('#xcodeAddr').val();
+        	unloadStream()
+        	var stopSess = $.ajax('http://' + xcodeAddr + ':49152/sysinfo/control', {
+	            data: {
+	                config: 'session',
+	                action: 'release',
+	                id: contextID,
+	                ifver: 1
+	            },
+	            global: false,          // Needed to avoid headers that cause the CORS logic to attempt an OPTIONS request.
+	            dataType: 'json'        // Stream lies, says it's text/html
+	        });
+	
+	        stopSess.done(function (data, statusText, jqXhr) {
+	            console.log("releaseSession("+contextID+" DONE )")
+	            contextID=0
+	        })
+        }
+    }
+
+    //$('#startSession').click(streamShow())
+    console.log("ready( done )");
+
+});
+
+
+</script>
+</body>
+</html>

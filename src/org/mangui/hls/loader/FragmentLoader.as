@@ -160,7 +160,7 @@ package org.mangui.hls.loader {
                        current level is not the lowest level */
                     if(_hls.autoLevel && !_manifestJustLoaded && _fragCurrent.level) {
                         // monitor fragment load progress after half of expected fragment duration,to stabilize bitrate
-                        var requestDelay : int = getTimer() - _metrics.loading_request_time;
+                        var requestDelay : int = getTimer() - _metrics.loading_begin_time;
                         var fragDuration : Number = _fragCurrent.duration;
                         if(requestDelay > 500*fragDuration) {
                             var loaded : int = _fragCurrent.data.bytesLoaded;
@@ -620,7 +620,7 @@ package org.mangui.hls.loader {
 
             var _loading_duration : uint = _metrics.loading_end_time - _metrics.loading_request_time;
             CONFIG::LOGGING {
-                Log.debug("Loading       duration/RTT/length/speed:" + _loading_duration + "/" + (_metrics.loading_begin_time - _metrics.loading_request_time) + "/" + _metrics.size + "/" + Math.round((8000 * _metrics.size / _loading_duration) / 1024) + " kb/s");
+                Log.info("Loading       duration/RTT/length/speed:" + _loading_duration + "/" + (_metrics.loading_begin_time - _metrics.loading_request_time) + "/" + _metrics.size + "/" + Math.round((8000 * _metrics.size / _loading_duration) / 1024) + " kb/s");
             }
             if (fragData.decryptAES) {
                 fragData.decryptAES.notifycomplete();
@@ -773,7 +773,7 @@ package org.mangui.hls.loader {
             var frag : Fragment = _levels[level].getFragmentBeforePosition(position);
             _hasDiscontinuity = true;
             CONFIG::LOGGING {
-                Log.debug("Loading       " + frag.seqnum + " of [" + (_levels[level].start_seqnum) + "," + (_levels[level].end_seqnum) + "],level " + level);
+                Log.info("Loading       " + frag.seqnum + " of [" + (_levels[level].start_seqnum) + "," + (_levels[level].end_seqnum) + "],level " + level);
             }
             _loadfragment(frag);
             return LOADING_IN_PROGRESS;
@@ -981,7 +981,7 @@ package org.mangui.hls.loader {
             var fragData : FragmentData = _fragCurrent.data;
             if (fragData.video_width == 0) {
                 CONFIG::LOGGING {
-                    Log.debug("AVC: width/height:" + width + "/" + height);
+                    Log.info("AVC: width/height:" + width + "/" + height);
                 }
                 fragData.video_width = width;
                 fragData.video_height = height;
@@ -1114,7 +1114,7 @@ package org.mangui.hls.loader {
             // Calculate bandwidth
             _metrics.parsing_end_time = getTimer();
             CONFIG::LOGGING {
-                Log.debug("Total Process duration/length/bw:" + _metrics.processing_duration + "/" + _metrics.size + "/" + Math.round(_metrics.bandwidth / 1024) + " kb/s");
+                Log.info("Total Process duration/length/bw:" + _metrics.processing_duration + "/" + _metrics.size + "/" + Math.round(_metrics.bandwidth / 1024) + " kb/s");
             }
 
             if (_manifestJustLoaded) {

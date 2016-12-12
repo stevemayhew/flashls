@@ -121,6 +121,12 @@ package org.mangui.hls.controller {
                 }
             }
 
+            for (i = 1; i < _nbLevel; i++) {
+                CONFIG::LOGGING {
+                    Log.info("Level: " + i + "bitrate:"+_bitrate[i]+" switchup:"+_switchup[i] + " switchdown:" +_switchdown[i]);
+                }
+            }
+
             if (HLSSettings.capLevelToStage) {
                 _maxUniqueLevels = _maxLevelsWithUniqueDimensions;
             }
@@ -269,11 +275,10 @@ package org.mangui.hls.controller {
             var sftm : Number = Math.min(_lastSegmentDuration, rsft) / _lastFetchDuration;
             var max_level : Number = _maxLevel;
             var switch_to_level : int = current_level;
-            // CONFIG::LOGGING {
-            // Log.info("rsft:" + rsft);
-            // Log.info("sftm:" + sftm);
-            // }
-            // }
+             CONFIG::LOGGING {
+             Log.info("rsft:" + rsft);
+             Log.info("sftm:" + sftm);
+             }
             /* to switch level up :
             rsft should be greater than switch up condition
              */

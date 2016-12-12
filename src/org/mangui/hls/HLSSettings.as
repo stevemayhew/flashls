@@ -188,7 +188,7 @@ package org.mangui.hls {
          * transcoders cannot preserve the PTS of the original program source across start / stop transcode
          * boundaries.  As an alternative we drop back to relying on the EXTINF and/or
          */
-        public static var reportsUnreliablePTS : Boolean = true;
+        public static var reportsUnreliablePTS : Boolean = false;
 
         /**
          * keyLoadMaxRetry
@@ -250,7 +250,7 @@ package org.mangui.hls {
          *
          * Maximum count of skipped fragments in a row before an I/O Error will be raised.
          *      0 - no skip (same as fragmentLoadSkipAfterMaxRetry = false)
-         *      -1 - no limit for skipping, skip till the end of the playlist 
+         *      -1 - no limit for skipping, skip till the end of the playlist
          *
          * Default is 5.
          */
@@ -364,7 +364,7 @@ package org.mangui.hls {
         /** Log function to log to the Browser console, default is "console.log"
          *  NULL or empty string will log only to the flashlog.
          */
-        public static var consoleLogFunction : String = "console.log";
+        public static var consoleLogFunction : String = null;
         /**
          * logInfo
          *

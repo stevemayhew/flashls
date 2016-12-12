@@ -32,11 +32,11 @@
         }
 
         public function get bandwidth() : int {
-            return size * 8000 / (parsing_end_time - loading_request_time);
+            return size * 8000 / (parsing_end_time - loading_begin_time);
         }
 
         public function get processing_duration() : int {
-            return parsing_end_time-loading_request_time;
+            return parsing_end_time - loading_begin_time;
         }
     }
 }
