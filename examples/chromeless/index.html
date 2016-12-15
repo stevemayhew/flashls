@@ -55,8 +55,11 @@ button[disabled] {
     color: gainsboro;
 }
 
+body.use-native-player .hide-for-native {
+    display: none;
+}
 #customButtons input { width: 25%; display : inline-block; text-align: center; font-size: 8pt;}
-#toggleButtons button { width: 12%; display : inline-block; text-align: center; font-size: 8pt; background-color: #A0A0A0 }
+.toggleButtons button { width: 12%; display : inline-block; text-align: center; font-size: 8pt; background-color: #A0A0A0 }
 
 </style>
   <title>flashls - Chromeless HLS Flash Player</title>
@@ -65,17 +68,11 @@ button[disabled] {
 <meta name="author" content="mangui">
 <meta name="description" content="flashls is an HLS flash plugin/player">
 <meta name="keywords" content="hls, m3u8, http live streaming, apple hls, plugin, h264, H.264, x264, aac, mp3, flash, flashplayer, flash player, video, audio, mbr, multibitrate, multi bitrate, vod, video on demand, live, live stream, dvr, dvr stream, digital video recorder">
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-  ga('create', 'UA-52843650-1', 'auto');
-  ga('send', 'pageview');
-</script>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
 
 <script type="text/javascript" src="flashlsAPI.js"></script>
+<script type="text/javascript" src="VideoAPI.js"></script>
 <script type="text/javascript" src="../libs/ParsedQueryString.js"></script>
 <script type="text/javascript" src="../libs/JSLoaderFragment.js"></script>
 <script type="text/javascript" src="../libs/JSLoaderPlaylist.js"></script>
@@ -83,7 +80,6 @@ button[disabled] {
 <script type="text/javascript" src="../libs/canvas.js"></script>
 <script type="text/javascript" src="../libs/metrics.js"></script>
 <script type="text/javascript" src="../libs/jsonpack.js"></script>
-<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
@@ -107,8 +103,8 @@ button[disabled] {
     </header>
     <div id="controls">
         <div id="customButtons">
-            <lable>TCD IP:</lable><input type="text" value="10.100.51.25" id="tcdAddr">
-            <lable>Transcodre IP:</lable><input type="text" value="10.100.51.66" id="xcodeAddr">
+            <lable>TCD IP:</lable><input type="text" value="10.100.51.48" id="tcdAddr">
+            <lable>Transcoder IP:</lable><input type="text" value="10.100.51.48" id="xcodeAddr">
             <button type="button" id="loadShows">Load Shows</button>
             <button type="button" id="startSession">Start Session</button>
 
@@ -149,14 +145,14 @@ button[disabled] {
         <canvas id="buffered_c" width="640" height="15" onclick="buffered_seek(event)";></canvas> <br>
         <br>
     </div>
-    <div class="center" id="toggleButtons">
+    <div class="center toggleButtons">
       <button type="button" class="btn btn-sm" onclick="$('#PlaybackInfo').toggle();">playback info</button>
       <button type="button" class="btn btn-sm" onclick="$('#PlaybackControl').toggle();">playback controls</button>
-      <button type="button" class="btn btn-sm" onclick="$('#QualityLevelControl').toggle();">Quality Level controls</button>
-      <button type="button" class="btn btn-sm" onclick="$('#AdvancedControl').toggle();">advanced controls</button>
-      <button type="button" class="btn btn-sm" onclick="$('#MetricsDisplay').toggle();toggleMetricsDisplay();">Metrics Display</button>
-      <button type="button" class="btn btn-sm" onclick="$('#StatsDisplay').toggle();">Stats Display</button>
-      <button type="button" class="btn btn-sm" onclick="$('#VideoStatus').toggle();">Log Message</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#QualityLevelControl').toggle();">Quality Level controls</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#AdvancedControl').toggle();">advanced controls</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#MetricsDisplay').toggle();toggleMetricsDisplay();">Metrics Display</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#StatsDisplay').toggle();">Stats Display</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#VideoStatus').toggle();">Log Message</button>
     </div>
 
     <div id='PlaybackControl'>
@@ -335,6 +331,24 @@ $(document).ready(function() {
 //    }
 //    $('#streamURL').val(manifest);
 
+
+    // Test for support for HLS native
+    var useNativeHLS = false;
+    try {
+        var nativeHls = document.createElement('video').canPlayType('application/vnd.apple.mpegURL');
+
+        useNativeHLS = !!nativeHls;
+    } catch (err) {
+        console.log(err);
+    }
+
+    if (useNativeHLS) {
+        $('body').addClass('use-native-player');
+        var $nativeVideo = $('<video class="native-video">');
+        $('#video').find('object').replaceWith($nativeVideo);
+
+        api = new VideoFlashlsAPI($nativeVideo[0], flashlsEvents);
+    }
     var mindRpc;
 
     var loadMyShowsReqst = {
@@ -393,7 +407,6 @@ $(document).ready(function() {
 
     $('#startSession').click(function() {
         $('#streamURL').val("");
-        $()
         var xcodeAddr = $('#xcodeAddr').val();
         var recording = $('#streamSelect').val();
         if (recording) {
@@ -535,8 +548,13 @@ var flashlsEvents = {
         width = $('#video').innerWidth()-30;
         height = Math.round(width / ratio);
     }
-   api.flashObject.width = width;
-   api.flashObject.height = height;
+
+      if (api.setSize) {
+          api.setSize(width, height);
+      } else {
+          api.flashObject.width = width;
+          api.flashObject.height = height;
+      }
    var canvas = $('#buffered_c')[0];
    canvas.width = width;
   },
