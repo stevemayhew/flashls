@@ -98,7 +98,7 @@
             } else {
                 nextContentSegment = _.find(self._adjustedSegments, function(segment) {
                     return streamTime <= segment.startOffset;
-                })
+                });
             }
 
             return !!nextContentSegment ? nextContentSegment.startOffset : null;
