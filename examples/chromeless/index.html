@@ -59,6 +59,8 @@ body.use-native-player .hide-for-native {
     display: none;
 }
 #customButtons input { width: 25%; display : inline-block; text-align: center; font-size: 8pt;}
+
+.toggleButtons { margin-top: 20px; }
 .toggleButtons button { width: 12%; display : inline-block; text-align: center; font-size: 8pt; background-color: #A0A0A0 }
 
 </style>
@@ -70,7 +72,7 @@ body.use-native-player .hide-for-native {
 <meta name="keywords" content="hls, m3u8, http live streaming, apple hls, plugin, h264, H.264, x264, aac, mp3, flash, flashplayer, flash player, video, audio, mbr, multibitrate, multi bitrate, vod, video on demand, live, live stream, dvr, dvr stream, digital video recorder">
 
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
-
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore.js"></script>
 <script type="text/javascript" src="flashlsAPI.js"></script>
 <script type="text/javascript" src="VideoAPI.js"></script>
 <script type="text/javascript" src="../libs/ParsedQueryString.js"></script>
@@ -80,6 +82,7 @@ body.use-native-player .hide-for-native {
 <script type="text/javascript" src="../libs/canvas.js"></script>
 <script type="text/javascript" src="../libs/metrics.js"></script>
 <script type="text/javascript" src="../libs/jsonpack.js"></script>
+    <script type="text/javascript" src="../libs/clippy.js"></script>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
@@ -115,6 +118,7 @@ body.use-native-player .hide-for-native {
       <br>
       <div id="StreamPermalink" class="innerControls"></div>
       <span id="currentResolution" style="float:left;font-size: 8pt;">-</span>
+      <span id="streamStartTime" style="float:right;font-size: 8pt;">-</span>
     </div>
 
     <div class="center" id="video">
@@ -144,10 +148,31 @@ body.use-native-player .hide-for-native {
         <br><br>
         <canvas id="buffered_c" width="640" height="15" onclick="buffered_seek(event)";></canvas> <br>
         <br>
+
+
+        <div class="transport-controls">
+          <button type="button" class="btn btn-sm btn-info" onclick="api.play(-1)">play</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.pause()">pause</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.resume()">resume</button>
+          <button type="button" class="btn btn-sm btn-info skip-button">skip</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()+10)">currentTime+=10</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()-10)">currentTime-=10</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.seek($('#seek_pos').val())">seek to </button>
+           <input type="text" id='seek_pos' size="8" onkeydown="if(window.event.keyCode=='13'){api.seek($('#seek_pos').val());}">
+          <button type="button" class="btn btn-sm btn-info" onclick="api.volume($('#vol_val').val())">set volume </button>
+           <input type="text" id='vol_val' size="8" onkeydown="if(window.event.keyCode=='13'){api.volume($('#vol_val').val());}">
+           <table>
+                <tr>
+                  <td>selectable audio tracks</td>
+                </tr>
+                <tr>
+                  <td> <div id="audioControl" style="display: inline;"></div> </td>
+                </tr>
+            </table>
+        </div>
     </div>
     <div class="center toggleButtons">
       <button type="button" class="btn btn-sm" onclick="$('#PlaybackInfo').toggle();">playback info</button>
-      <button type="button" class="btn btn-sm" onclick="$('#PlaybackControl').toggle();">playback controls</button>
       <button type="button" class="btn btn-sm hide-for-native" onclick="$('#QualityLevelControl').toggle();">Quality Level controls</button>
       <button type="button" class="btn btn-sm hide-for-native" onclick="$('#AdvancedControl').toggle();">advanced controls</button>
       <button type="button" class="btn btn-sm hide-for-native" onclick="$('#MetricsDisplay').toggle();toggleMetricsDisplay();">Metrics Display</button>
@@ -155,26 +180,6 @@ body.use-native-player .hide-for-native {
       <button type="button" class="btn btn-sm hide-for-native" onclick="$('#VideoStatus').toggle();">Log Message</button>
     </div>
 
-    <div id='PlaybackControl'>
-    <h4> Playback Control </h4>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.play(-1)">play</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.pause()">pause</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.resume()">resume</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()+10)">currentTime+=10</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()-10)">currentTime-=10</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.seek($('#seek_pos').val())">seek to </button>
-       <input type="text" id='seek_pos' size="8" onkeydown="if(window.event.keyCode=='13'){api.seek($('#seek_pos').val());}">
-      <button type="button" class="btn btn-sm btn-info" onclick="api.volume($('#vol_val').val())">set volume </button>
-       <input type="text" id='vol_val' size="8" onkeydown="if(window.event.keyCode=='13'){api.volume($('#vol_val').val());}">
-       <table>
-            <tr>
-              <td>selectable audio tracks</td>
-            </tr>
-            <tr>
-              <td> <div id="audioControl" style="display: inline;"></div> </td>
-            </tr>
-        </table>
-    </div>
 
     <div id='QualityLevelControl'>
     <h4> Quality Control </h4>
@@ -315,7 +320,6 @@ body.use-native-player .hide-for-native {
 $(document).ready(function() {
     $('button').attr('disabled', false);
     $('#streamURL').change(function()           { loadStream($('#streamURL').val());});
-   $("#PlaybackControl").hide();
    $("#PlaybackInfo").hide();
    $("#QualityLevelControl").hide();
    $("#AdvancedControl").hide();
@@ -325,11 +329,7 @@ $(document).ready(function() {
    $('#metricsButtonWindow').toggle(windowSliding);
    $('#metricsButtonFixed').toggle(!windowSliding);
 
-//    var manifest = decodeURIComponent(location.search.split('src=')[1]);
-//    if(manifest === 'undefined') {
-//      manifest = 'http://www.streambox.fr/playlists/x36xhzz/x36xhzz.m3u8';
-//    }
-//    $('#streamURL').val(manifest);
+    window.clippy = null;
 
 
     // Test for support for HLS native
@@ -347,7 +347,18 @@ $(document).ready(function() {
         var $nativeVideo = $('<video class="native-video">');
         $('#video').find('object').replaceWith($nativeVideo);
 
-        api = new VideoFlashlsAPI($nativeVideo[0], flashlsEvents);
+        api = new VideoFlashlsAPI($nativeVideo[0], $.extend({}, flashlsEvents, {
+            id3Metadata: function(metadata) {
+                var streamStart = metadata.timeStats.startStreamTime.valms;
+                $('#streamStartTime').text(streamStart);
+
+                if (clippy) {
+                    var adjusted = clippy.adjustSegments(streamStart);
+
+                    $('.skip-button').prop('disabled', ! adjusted);
+                }
+            }
+        }));
     }
     var mindRpc;
 
@@ -363,25 +374,36 @@ $(document).ready(function() {
 
     var bodyId;
 
+    $('.skip-button').prop('disabled', true);
+    $('.skip-button').click(function() {
+
+        if (clippy) {
+            var nextPosition = clippy.nextContentSegmentStartOffset(api.getPosition());
+            if (nextPosition) {
+                api.seek(nextPosition);
+            }
+        }
+    });
+
     function loadMyShows() {
         mindRpc.request(loadMyShowsReqst, function(response) {
-//            console.log(response);
+            console.log(response);
 //            $('#loadShows').attr("disabled", false);
 
             var titleAndRecording = $.map(response.myShowsItem, function(val) {
                 var show = val.episodeTitle ? val.title + "("+val.episodeTitle+")" : val.title;
-                return { title: show, myShowsItemId: val.myShowsItemId};
+                return { title: show, myShowsItemId: val.myShowsItemId, contentId: val.contentId};
             });
 
             var sorted = titleAndRecording.sort(function(a, b) {
                 return a.title.localeCompare(b.title);
             });
 
-
             $('#streamSelect').empty();
             $.each(sorted, function() {
                 var $option = $('<option>').text(this.title);
                 $option.attr('value', this.myShowsItemId);
+                $option.data('msi', this);
                 $('#streamSelect').append($option);
             });
 
@@ -409,6 +431,11 @@ $(document).ready(function() {
         $('#streamURL').val("");
         var xcodeAddr = $('#xcodeAddr').val();
         var recording = $('#streamSelect').val();
+        var msi = $('#streamSelect > :selected').data('msi');
+
+        clippy = new Clippy(mindRpc);
+        clippy.fetchAdjustedSegments(msi.contentId, msi.myShowsItemId);
+
         if (recording) {
             objectSearch.objectId = recording;
 
@@ -815,17 +842,31 @@ function buffered_seek(event) {
 }
 
 function updateBufferCanvas(position,duration,buffer, backbuffer) {
-  var canvas = document.getElementById('buffered_c');
-  var ctx = canvas.getContext('2d');
-  ctx.fillStyle = "black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = "gray";
-  var start = (position-backbuffer)/duration * canvas.width;
-  var end = (position+buffer)/duration * canvas.width;
-  ctx.fillRect(start, 3, Math.max(2, end-start), 10);
-  ctx.fillStyle = "blue";
-  var x = position / duration * canvas.width;
-  ctx.fillRect(x, 0, 2, 15);
+    var canvas = document.getElementById('buffered_c');
+    var ctx = canvas.getContext('2d');
+
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "gray";
+    var start = (position-backbuffer)/duration * canvas.width;
+    var end = (position+buffer)/duration * canvas.width;
+    ctx.fillRect(start, 3, Math.max(2, end-start), 10);
+
+    if (clippy) {
+        var adSegments = clippy.getAdjustedAdSegments();
+        ctx.fillStyle = "#b2851c";
+
+        _.each(adSegments, function(segment) {
+            var start = segment.startOffset / duration * canvas.width;
+            var end = segment.endOffset / duration * canvas.width;
+            ctx.fillRect(start, 3, Math.max(2, end - start), 10);
+        });
+    }
+
+    ctx.fillStyle = "blue";
+    var x = position / duration * canvas.width;
+    ctx.fillRect(x, 0, 2, 15);
 }
 
   function updateLevelInfo() {
