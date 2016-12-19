@@ -72,9 +72,11 @@ body.use-native-player .hide-for-native {
 <meta name="keywords" content="hls, m3u8, http live streaming, apple hls, plugin, h264, H.264, x264, aac, mp3, flash, flashplayer, flash player, video, audio, mbr, multibitrate, multi bitrate, vod, video on demand, live, live stream, dvr, dvr stream, digital video recorder">
 
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
+    <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.min.js" integrity="sha256-xNjb53/rY+WmG+4L6tTl9m6PpqknWZvRt0rO1SRnJzw=" crossorigin="anonymous"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore.js"></script>
 <script type="text/javascript" src="flashlsAPI.js"></script>
 <script type="text/javascript" src="VideoAPI.js"></script>
+    <script type="text/javascript" src="hlsplayer.js"></script>
 <script type="text/javascript" src="../libs/ParsedQueryString.js"></script>
 <script type="text/javascript" src="../libs/JSLoaderFragment.js"></script>
 <script type="text/javascript" src="../libs/JSLoaderPlaylist.js"></script>
@@ -122,33 +124,9 @@ body.use-native-player .hide-for-native {
     </div>
 
     <div class="center" id="video">
-        <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
-         codebase="" id="moviename" width="720" height="480">
-        <param name="movie"  value="../../bin/debug/flashlsChromeless.swf?inline=1" />
-        <param name="quality" value="autohigh" />
-        <param name="swliveconnect" value="true" />
-        <param name="allowScriptAccess" value="sameDomain" />
-        <param name="bgcolor" value="#0" />
-        <param name="allowFullScreen" value="true" />
-        <param name="wmode" value="window" />
-        <param name="FlashVars" value="callback=flashlsCallback" />
-
-        <embed src="../../bin/debug/flashlsChromeless.swf?inline=1" width="720" height="480" name="moviename"
-                    quality="autohigh"
-                    bgcolor="#0"
-                    align="middle" allowFullScreen="true"
-                    allowScriptAccess="sameDomain"
-                    type="application/x-shockwave-flash"
-                    swliveconnect="true"
-                    wmode="window"
-                    FlashVars="callback=flashlsCallback"
-                    pluginspage="http://www.macromedia.com/go/getflashplayer" >
-        </embed>
-        </object>
         <br><br>
         <canvas id="buffered_c" width="640" height="15" onclick="buffered_seek(event)";></canvas> <br>
         <br>
-
 
         <div class="transport-controls">
           <button type="button" class="btn btn-sm btn-info" onclick="api.play(-1)">play</button>
@@ -329,37 +307,58 @@ $(document).ready(function() {
    $('#metricsButtonWindow').toggle(windowSliding);
    $('#metricsButtonFixed').toggle(!windowSliding);
 
-    window.clippy = null;
+    window.clippy = null;       // Made global for update the canvas with the buffer/position bar.
 
+    var eventHandlers = $.extend({}, flashlsEvents, {
 
-    // Test for support for HLS native
-    var useNativeHLS = false;
-    try {
-        var nativeHls = document.createElement('video').canPlayType('application/vnd.apple.mpegURL');
+        id3Updated: function(id3Data) {
+            var data = atob(event.ID3Data);
 
-        useNativeHLS = !!nativeHls;
-    } catch (err) {
-        console.log(err);
-    }
+            // Find the frameId of the first frame. Skip past the ID3 Header, which is 10 bytes long.
+            var id3frameId = data.slice(10, 14);
 
-    if (useNativeHLS) {
-        $('body').addClass('use-native-player');
-        var $nativeVideo = $('<video class="native-video">');
-        $('#video').find('object').replaceWith($nativeVideo);
+            // Assume this is a "PRIV" tag and grab the owner Id. Skip the ID3 Frame header, which is also 10 bytes long.
+            var id3ownerId = data.slice(20, 24);
 
-        api = new VideoFlashlsAPI($nativeVideo[0], $.extend({}, flashlsEvents, {
-            id3Metadata: function(metadata) {
-                var streamStart = metadata.timeStats.startStreamTime.valms;
-                $('#streamStartTime').text(streamStart);
+            // Incoming data assumed to be a string, since that's what atob() returns.
+            var id3data = [];
 
-                if (clippy) {
-                    var adjusted = clippy.adjustSegments(streamStart);
-
-                    $('.skip-button').prop('disabled', ! adjusted);
-                }
+            // Skip over the "ID3" header with flags and length: 10 bytes;
+            // Skip over the "PRIV" key with flags and length: 10 bytes.
+            // Skip over the "TiVo" null-terminated info string. 5 bytes.
+            // Total of 25 bytes before we get to the data we care about, assuming this is a TiVo PRIV tag.
+            var offset = 25;
+            for(var x=offset; x < data.length; x++) {
+                id3data.push(data.charCodeAt(x));
             }
-        }));
-    }
+
+            // Make sure that the incoming data is now an ArrayBuffer, for input to the DataView.
+            id3data = new Uint8Array(id3data).buffer;
+            var metadata = this.parseTivoMetadata(id3data);
+            this.id3Metadata(metadata);
+
+        },
+
+        id3Metadata: function(metadata) {
+            var streamStart = metadata.timeStats.startStreamTime.valms;
+            $('#streamStartTime').text(streamStart);
+
+            if (clippy) {
+                var adjusted = clippy.adjustSegments(streamStart);
+
+                $('.skip-button').prop('disabled', ! adjusted);
+            }
+        }
+    });
+
+    $('#video').chromelessPlayer({
+        eventHandlers: eventHandlers,
+
+        onReady: function(api) {
+            window.api = api;
+        }
+    });
+
     var mindRpc;
 
     var loadMyShowsReqst = {
@@ -463,8 +462,7 @@ $(document).ready(function() {
                 })
             });
         }
-    })
-
+    });
 });
 
 
@@ -547,18 +545,12 @@ function toggleCapLeveltoStage() {
   api.playerCapLeveltoStage(state);
 }
 
-// Create a single global callback function and pass it's name
-// to the SWF with the name `callback` in the FlashVars parameter.
-window.flashlsCallback = function(eventName, args) {
-  flashlsEvents[eventName].apply(null, args);
-};
-
 var flashlsEvents = {
    ready: function(flashTime) {
     flashPingDate = flashTime;
     jsPingDate = new Date();
     appendLog("onHLSReady()");
-    api = new flashlsAPI(getFlashMovieObject("moviename"));
+    api = this;
     $('#debugLogState').html(api.getLogDebug().toString());
     $('#debug2LogState').html(api.getLogDebug2().toString());
     $('#flushLiveURLState').html(api.getflushLiveURLCache().toString());

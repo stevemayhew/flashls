@@ -307,7 +307,7 @@
                 // STATS tags come in every 5 seconds but TRACK_INFO tags come in much more frequently than that.
                 // We cannot simply throttle this callback because it is likely we'll miss STATS tags. The overhead
                 // of constantly parsing tags does not seem to affect performance.
-                return self._parseTivoMetadata(data);
+                return self.parseTivoMetadata(data);
             }
         },
 
@@ -372,7 +372,7 @@
          * @returns parsedTimedMetadataPayload - an object that contains info similar in structure to the description above
          * @private
          */
-        _parseTivoMetadata: function(data) {
+        parseTivoMetadata: function(data) {
             var reader = new DataView(data);
             var tmp = {}; // this objects contains parsed information from timedMetadataPayload
             var offset = 0; // Start of our 'PRIV' tag.
