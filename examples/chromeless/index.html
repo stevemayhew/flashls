@@ -74,7 +74,6 @@ body.use-native-player .hide-for-native {
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
     <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.min.js" integrity="sha256-xNjb53/rY+WmG+4L6tTl9m6PpqknWZvRt0rO1SRnJzw=" crossorigin="anonymous"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore.js"></script>
-<script type="text/javascript" src="flashlsAPI.js"></script>
 <script type="text/javascript" src="VideoAPI.js"></script>
     <script type="text/javascript" src="hlsplayer.js"></script>
 <script type="text/javascript" src="../libs/ParsedQueryString.js"></script>
@@ -309,16 +308,20 @@ $(document).ready(function() {
 
     window.clippy = null;       // Made global for update the canvas with the buffer/position bar.
 
+    function timedMetadataUpdated(metadata) {
+        var streamStart = metadata.timeStats.startStreamTime.valms;
+        $('#streamStartTime').text(streamStart);
+
+        if (clippy) {
+            var adjusted = clippy.adjustSegments(streamStart);
+
+            $('.skip-button').prop('disabled', !adjusted);
+        }
+    }
+
     var eventHandlers = $.extend({}, flashlsEvents, {
-
         id3Updated: function(id3Data) {
-            var data = atob(event.ID3Data);
-
-            // Find the frameId of the first frame. Skip past the ID3 Header, which is 10 bytes long.
-            var id3frameId = data.slice(10, 14);
-
-            // Assume this is a "PRIV" tag and grab the owner Id. Skip the ID3 Frame header, which is also 10 bytes long.
-            var id3ownerId = data.slice(20, 24);
+            var data = atob(id3Data);
 
             // Incoming data assumed to be a string, since that's what atob() returns.
             var id3data = [];
@@ -335,19 +338,11 @@ $(document).ready(function() {
             // Make sure that the incoming data is now an ArrayBuffer, for input to the DataView.
             id3data = new Uint8Array(id3data).buffer;
             var metadata = this.parseTivoMetadata(id3data);
-            this.id3Metadata(metadata);
-
+            timedMetadataUpdated(metadata);
         },
 
         id3Metadata: function(metadata) {
-            var streamStart = metadata.timeStats.startStreamTime.valms;
-            $('#streamStartTime').text(streamStart);
-
-            if (clippy) {
-                var adjusted = clippy.adjustSegments(streamStart);
-
-                $('.skip-button').prop('disabled', ! adjusted);
-            }
+            timedMetadataUpdated(metadata);
         }
     });
 

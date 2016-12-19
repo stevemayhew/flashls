@@ -57,7 +57,7 @@
                     var handlerFn = self.options.eventHandlers[eventName];
 
                     if (eventName === 'ready') {
-                        self.playerApi = new flashlsAPI($playerElement[0]);
+                        self.playerApi = new FlashlsAPI($playerElement[0]);
                         self.options.onReady(self.playerApi);
                     }
                     if ($.isFunction(handlerFn)) {

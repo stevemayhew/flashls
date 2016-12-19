@@ -1,316 +1,6 @@
 (function(factory, $, _, debug) {
 
-    function VideoFlashlsAPI(videoElement, flashlsEvents) {
-        var self = this;
-        self._video = videoElement;
-        self._flashlsEvents = flashlsEvents;
-
-        videoElement.addEventListener('loadstart', function(event) {
-            debug.log("Video loadstart event, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-        });
-
-        videoElement.addEventListener('loadeddata', function(event) {
-            debug.log("Video loadeddata event, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-        });
-
-        videoElement.addEventListener('canplay', function(event) {
-            debug.log("Video canplay, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-        });
-
-        videoElement.addEventListener('canplaythrough', function(event) {
-            debug.log("Video canplaythrough, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-
-            if (flashlsEvents && flashlsEvents.videoSize && self._video.videoWidth > 0) {
-                flashlsEvents.videoSize(self._video.videoWidth, self._video.videoHeight);
-            }
-        });
-
-        videoElement.addEventListener('loadedmetadata', function(event) {
-            debug.log("Video loadedmetadata, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-
-            if (flashlsEvents && flashlsEvents.videoSize && self._video.videoWidth > 0) {
-                flashlsEvents.videoSize(self._video.videoWidth, self._video.videoHeight);
-            }
-        });
-
-        videoElement.addEventListener('durationchange', function(event) {
-            debug.log("Video durationchange, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-
-            self.durationChangedEvent(event);
-        });
-
-        videoElement.addEventListener('timeupdate', function(event) {
-            //debug.log("Video timeupdate, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-
-            if (! self._hasMetaListener) {
-                var tracks = self._video.textTracks;
-                _.each(tracks, function(track) {
-                    //debug.info("track", track);
-                    if (track.kind === "metadata") {
-                        track.mode = "hidden";      // This turns on cue events.
-
-                        self._hasMetaListener = true;
-                        self._metadataCueEvent(track.activeCues);
-
-                        track.addEventListener('cuechange', function(cueChange) {
-                            self._metadataCueEvent(this.activeCues);
-                        });
-                    }
-                });
-            }
-
-            if (flashlsEvents && flashlsEvents.position) {
-
-                var timemetrics = {};
-                timemetrics.position = self.getPosition();
-                timemetrics.duration = self.getDuration();
-
-                var buffer = self._video.buffered;
-                if (buffer && buffer.length > 0) {
-                    var start = buffer.start(0);
-                    var end = buffer.end(0);
-
-                    timemetrics.buffer = end - start;
-                    timemetrics.backbuffer = Math.max(0, timemetrics.position - start);
-                } else {
-                    timemetrics.buffer = 0;
-                    timemetrics.backbuffer = 0;
-                }
-                timemetrics.live_sliding_main = 0;
-                timemetrics.watched = 0;
-
-
-                flashlsEvents.position(timemetrics, event);
-            }
-        });
-
-        videoElement.addEventListener('error', function(event) {
-            debug.warn("Video error.  Error: "+ videoElement.error +" error code: "+videoElement.error.code +
-                       ", readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
-        });
-    }
-
-    $.extend(VideoFlashlsAPI.prototype, {
-        load: function(url) {
-            this._video.src = url;
-        },
-
-        play: function(offset) {
-            this.seek(offset);
-            this._video.play();
-        },
-
-        pause: function() {
-            this._video.pause();
-        },
-
-        resume: function() {
-            this._video.play();
-        },
-
-        seek: function(offset) {
-            var value = parseFloat(offset);
-            if (! isNaN(value)) {
-                this._video.currentTime = offset;
-            }
-        },
-
-        stop: function() {
-            this._video.pause();
-        },
-
-        volume: function(volume) {
-
-        },
-
-        setCurrentLevel: function(level) {
-
-        },
-
-        setNextLevel: function(level) {
-
-        },
-
-        setLoadLevel: function(level) {
-
-        },
-
-        setMaxBufferLength: function(len) {
-
-        },
-
-        getPosition: function() {
-            return this._video.currentTime;
-        },
-
-        getDuration: function() {
-            return this._video.duration;
-        },
-
-        getbufferLength: function() {
-            return
-        },
-
-        getbackBufferLength: function() {
-            return
-        },
-
-        getLowBufferLength: function() {
-            return
-        },
-
-        getMinBufferLength: function() {
-            return
-        },
-
-        getMaxBufferLength: function() {
-            return
-        },
-
-        getLevels: function() {
-            return
-        },
-
-        getAutoLevel: function() {
-            return
-        },
-
-        getCurrentLevel: function() {
-            return
-        },
-
-        getNextLevel: function() {
-            return
-        },
-
-        getLoadLevel: function() {
-            return
-        },
-
-        getAudioTrackList: function() {
-            return
-        },
-
-        getStats: function() {
-            return
-        },
-
-        setAudioTrack: function(trackId) {
-
-        },
-
-        playerSetLogDebug: function(state) {
-
-        },
-
-        getLogDebug: function() {
-            return
-        },
-
-        playerSetLogDebug2: function(state) {
-
-        },
-
-        getLogDebug2: function() {
-            return
-        },
-
-        playerSetUseHardwareVideoDecoder: function(state) {
-
-        },
-
-        getUseHardwareVideoDecoder: function() {
-            return
-        },
-
-        playerSetflushLiveURLCache: function(state) {
-
-        },
-
-        getflushLiveURLCache: function() {
-            return
-        },
-
-        playerSetJSURLStream: function(state) {
-
-        },
-
-        getJSURLStream: function() {
-            return
-        },
-
-        playerCapLeveltoStage: function(state) {
-
-        },
-
-        getCapLeveltoStage: function() {
-            return
-        },
-
-        playerSetAutoLevelCapping: function(level) {
-
-        },
-
-        getAutoLevelCapping: function() {
-            return
-        },
-
-        //////  Unique to Video element API
-
-        durationChangedEvent: function(event) {
-
-        },
-
-        setSize: function(width, height) {
-            this._video.width = width;
-            this._video.height = height;
-        },
-
-        /**
-         * Event when called when the Metadata (ID3) TextTrack queue is updated.  This either
-         * comes native from the HLS player in Safari Video Element, as documented here:
-         * http://www.w3.org/TR/2011/WD-html5-20110405/video.html#timed-text-tracks
-         * Or it is simulated by the MediaElementJS player with ActionScript / JS code.
-         *
-         *
-         * @param activeCues TextTrackCueList - http://www.w3.org/TR/2011/WD-html5-20110405/video.html#texttrackcuelist
-         * @private
-         */
-        _metadataCueEvent: function (activeCues) {
-            var self = this;
-
-            _.each(activeCues, function(textTrackCue) {
-                //debug.info(textTrackCue);
-                var metadata = self._processId3Metadata(textTrackCue);
-
-                if (self._flashlsEvents && self._flashlsEvents.id3Metadata && metadata) {
-                    self._flashlsEvents.id3Metadata(metadata);
-                }
-            });
-        },
-        /**
-         * Process a TextTrackCue with ID3 metadata. This method figures out if it's TiVo metadata and if so post a change
-         * to playback monitor.
-         * It is possible that other ID3 metadata could come here form various playback sources.
-         * If it's not valid TiVo data we ignore it.
-         *
-         * @param textTrackCue
-         * @private
-         */
-        _processId3Metadata: function (textTrackCue) {
-            var self = this;
-            var frameId = textTrackCue.value.key;
-            var ownerId = textTrackCue.value.info;
-            var data = textTrackCue.value.data;
-
-            if (frameId === 'PRIV' && ownerId === 'TiVo') {
-                // STATS tags come in every 5 seconds but TRACK_INFO tags come in much more frequently than that.
-                // We cannot simply throttle this callback because it is likely we'll miss STATS tags. The overhead
-                // of constantly parsing tags does not seem to affect performance.
-                return self.parseTivoMetadata(data);
-            }
-        },
-
+    var sharedFunctions = {
         /**
          * Parses a TiVo Stream's ID3 tags metadata.
          *
@@ -527,8 +217,474 @@
 
             return tmp;
         }
+    };
+
+    function FlashlsAPI(flashObject) {
+        this.flashObject = flashObject;
+    }
+
+    $.extend(FlashlsAPI.prototype, sharedFunctions, {
+        load: function(url) {
+            this.flashObject.playerLoad(url);
+        },
+
+        play: function(offset) {
+            this.flashObject.playerPlay(offset);
+        },
+
+        pause: function() {
+            this.flashObject.playerPause();
+        },
+
+        resume: function() {
+            this.flashObject.playerResume();
+        },
+
+        seek: function(offset) {
+            this.flashObject.playerSeek(offset);
+        },
+
+        stop: function() {
+            this.flashObject.playerStop();
+        },
+
+        volume: function(volume) {
+            this.flashObject.playerVolume(volume);
+        },
+
+        setCurrentLevel: function(level) {
+            this.flashObject.playerSetCurrentLevel(level);
+        },
+
+        setNextLevel: function(level) {
+            this.flashObject.playerSetNextLevel(level);
+        },
+
+        setLoadLevel: function(level) {
+            this.flashObject.playerSetLoadLevel(level);
+        },
+
+        setMaxBufferLength: function(len) {
+            this.flashObject.playerSetmaxBufferLength(len);
+        },
+
+        getPosition: function() {
+            return this.flashObject.getPosition();
+        },
+
+        getDuration: function() {
+            return this.flashObject.getDuration();
+        },
+
+        getbufferLength: function() {
+            return this.flashObject.getbufferLength();
+        },
+
+        getbackBufferLength: function() {
+            return this.flashObject.getbackBufferLength();
+        },
+
+        getLowBufferLength: function() {
+            return this.flashObject.getlowBufferLength();
+        },
+
+        getMinBufferLength: function() {
+            return this.flashObject.getminBufferLength();
+        },
+
+        getMaxBufferLength: function() {
+            return this.flashObject.getmaxBufferLength();
+        },
+
+        getLevels: function() {
+            return this.flashObject.getLevels();
+        },
+
+        getAutoLevel: function() {
+            return this.flashObject.getAutoLevel();
+        },
+
+        getCurrentLevel: function() {
+            return this.flashObject.getCurrentLevel();
+        },
+
+        getNextLevel: function() {
+            return this.flashObject.getNextLevel();
+        },
+
+        getLoadLevel: function() {
+            return this.flashObject.getLoadLevel();
+        },
+
+        getAudioTrackList: function() {
+            return this.flashObject.getAudioTrackList();
+        },
+
+        getStats: function() {
+            return this.flashObject.getStats();
+        },
+
+        setAudioTrack: function(trackId) {
+            this.flashObject.playerSetAudioTrack(trackId);
+        },
+
+        playerSetLogDebug: function(state) {
+            this.flashObject.playerSetLogDebug(state);
+        },
+
+        getLogDebug: function() {
+            return this.flashObject.getLogDebug();
+        },
+
+        playerSetLogDebug2: function(state) {
+            this.flashObject.playerSetLogDebug2(state);
+        },
+
+        getLogDebug2: function() {
+            return this.flashObject.getLogDebug2();
+        },
+
+        playerSetUseHardwareVideoDecoder: function(state) {
+            this.flashObject.playerSetUseHardwareVideoDecoder(state);
+        },
+
+        getUseHardwareVideoDecoder: function() {
+            return this.flashObject.getUseHardwareVideoDecoder();
+        },
+
+        playerSetflushLiveURLCache: function(state) {
+            this.flashObject.playerSetflushLiveURLCache(state);
+        },
+
+        getflushLiveURLCache: function() {
+            return this.flashObject.getflushLiveURLCache();
+        },
+
+        playerSetJSURLStream: function(state) {
+            this.flashObject.playerSetJSURLStream(state);
+        },
+
+        getJSURLStream: function() {
+            return this.flashObject.getJSURLStream();
+        },
+
+        playerCapLeveltoStage: function(state) {
+            this.flashObject.playerCapLeveltoStage(state);
+        },
+
+        getCapLeveltoStage: function() {
+            return this.flashObject.getCapLeveltoStage();
+        },
+
+        playerSetAutoLevelCapping: function(level) {
+            this.flashObject.playerSetAutoLevelCapping(level);
+        },
+
+        getAutoLevelCapping: function() {
+            return this.flashObject.getAutoLevelCapping();
+        }
+    });
+
+
+    /**
+     * Player API for the Native Video element.
+     *
+     * @param videoElement
+     * @param flashlsEvents
+     * @constructor
+     */
+    function VideoFlashlsAPI(videoElement, flashlsEvents) {
+        var self = this;
+        self._video = videoElement;
+        self._flashlsEvents = flashlsEvents;
+
+        videoElement.addEventListener('loadstart', function(event) {
+            debug.log("Video loadstart event, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+        });
+
+        videoElement.addEventListener('loadeddata', function(event) {
+            debug.log("Video loadeddata event, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+        });
+
+        videoElement.addEventListener('canplay', function(event) {
+            debug.log("Video canplay, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+        });
+
+        videoElement.addEventListener('canplaythrough', function(event) {
+            debug.log("Video canplaythrough, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+
+            if (flashlsEvents && flashlsEvents.videoSize && self._video.videoWidth > 0) {
+                flashlsEvents.videoSize(self._video.videoWidth, self._video.videoHeight);
+            }
+        });
+
+        videoElement.addEventListener('loadedmetadata', function(event) {
+            debug.log("Video loadedmetadata, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+
+            if (flashlsEvents && flashlsEvents.videoSize && self._video.videoWidth > 0) {
+                flashlsEvents.videoSize(self._video.videoWidth, self._video.videoHeight);
+            }
+        });
+
+        videoElement.addEventListener('durationchange', function(event) {
+            debug.log("Video durationchange, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+
+            self.durationChangedEvent(event);
+        });
+
+        videoElement.addEventListener('timeupdate', function(event) {
+            //debug.log("Video timeupdate, readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+
+            if (! self._hasMetaListener) {
+                var tracks = self._video.textTracks;
+                _.each(tracks, function(track) {
+                    //debug.info("track", track);
+                    if (track.kind === "metadata") {
+                        track.mode = "hidden";      // This turns on cue events.
+
+                        self._hasMetaListener = true;
+                        self._metadataCueEvent(track.activeCues);
+
+                        track.addEventListener('cuechange', function(cueChange) {
+                            self._metadataCueEvent(this.activeCues);
+                        });
+                    }
+                });
+            }
+
+            if (flashlsEvents && flashlsEvents.position) {
+
+                var timemetrics = {};
+                timemetrics.position = self.getPosition();
+                timemetrics.duration = self.getDuration();
+
+                var buffer = self._video.buffered;
+                if (buffer && buffer.length > 0) {
+                    var start = buffer.start(0);
+                    var end = buffer.end(0);
+
+                    timemetrics.buffer = end - start;
+                    timemetrics.backbuffer = Math.max(0, timemetrics.position - start);
+                } else {
+                    timemetrics.buffer = 0;
+                    timemetrics.backbuffer = 0;
+                }
+                timemetrics.live_sliding_main = 0;
+                timemetrics.watched = 0;
+
+
+                flashlsEvents.position(timemetrics, event);
+            }
+        });
+
+        videoElement.addEventListener('error', function(event) {
+            debug.warn("Video error.  Error: "+ videoElement.error +" error code: "+videoElement.error.code +
+                       ", readyState:"+videoElement.readyState+", networkState:"+videoElement.networkState, event);
+        });
+    }
+
+    $.extend(VideoFlashlsAPI.prototype, sharedFunctions, {
+        load: function(url) {
+            this._video.src = url;
+        },
+
+        play: function(offset) {
+            this.seek(offset);
+            this._video.play();
+        },
+
+        pause: function() {
+            this._video.pause();
+        },
+
+        resume: function() {
+            this._video.play();
+        },
+
+        seek: function(offset) {
+            var value = parseFloat(offset);
+            if (! isNaN(value)) {
+                this._video.currentTime = offset;
+            }
+        },
+
+        stop: function() {
+            this._video.pause();
+        },
+
+        volume: function(volume) {
+
+        },
+
+        setCurrentLevel: function(level) {
+
+        },
+
+        setNextLevel: function(level) {
+
+        },
+
+        setLoadLevel: function(level) {
+
+        },
+
+        setMaxBufferLength: function(len) {
+
+        },
+
+        getPosition: function() {
+            return this._video.currentTime;
+        },
+
+        getDuration: function() {
+            return this._video.duration;
+        },
+
+        getbufferLength: function() {
+        },
+
+        getbackBufferLength: function() {
+        },
+
+        getLowBufferLength: function() {
+        },
+
+        getMinBufferLength: function() {
+        },
+
+        getMaxBufferLength: function() {
+        },
+
+        getLevels: function() {
+        },
+
+        getAutoLevel: function() {
+        },
+
+        getCurrentLevel: function() {
+        },
+
+        getNextLevel: function() {
+        },
+
+        getLoadLevel: function() {
+        },
+
+        getAudioTrackList: function() {
+        },
+
+        getStats: function() {
+        },
+
+        setAudioTrack: function(trackId) {
+
+        },
+
+        playerSetLogDebug: function(state) {
+
+        },
+
+        getLogDebug: function() {
+        },
+
+        playerSetLogDebug2: function(state) {
+
+        },
+
+        getLogDebug2: function() {
+        },
+
+        playerSetUseHardwareVideoDecoder: function(state) {
+
+        },
+
+        getUseHardwareVideoDecoder: function() {
+        },
+
+        playerSetflushLiveURLCache: function(state) {
+
+        },
+
+        getflushLiveURLCache: function() {
+        },
+
+        playerSetJSURLStream: function(state) {
+
+        },
+
+        getJSURLStream: function() {
+        },
+
+        playerCapLeveltoStage: function(state) {
+
+        },
+
+        getCapLeveltoStage: function() {
+        },
+
+        playerSetAutoLevelCapping: function(level) {
+        },
+
+        getAutoLevelCapping: function() {
+        },
+
+        durationChangedEvent: function(event) {
+        },
+
+        setSize: function(width, height) {
+            this._video.width = width;
+            this._video.height = height;
+        },
+
+        /**
+         * Event when called when the Metadata (ID3) TextTrack queue is updated.  This either
+         * comes native from the HLS player in Safari Video Element, as documented here:
+         * http://www.w3.org/TR/2011/WD-html5-20110405/video.html#timed-text-tracks
+         * Or it is simulated by the MediaElementJS player with ActionScript / JS code.
+         *
+         *
+         * @param activeCues TextTrackCueList - http://www.w3.org/TR/2011/WD-html5-20110405/video.html#texttrackcuelist
+         * @private
+         */
+        _metadataCueEvent: function (activeCues) {
+            var self = this;
+
+            _.each(activeCues, function(textTrackCue) {
+                //debug.info(textTrackCue);
+                var metadata = self._processId3Metadata(textTrackCue);
+
+                if (self._flashlsEvents && self._flashlsEvents.id3Metadata && metadata) {
+                    self._flashlsEvents.id3Metadata(metadata);
+                }
+            });
+        },
+
+        /**
+         * Process a TextTrackCue with ID3 metadata. This method figures out if it's TiVo metadata and if so post a change
+         * to playback monitor.
+         * It is possible that other ID3 metadata could come here form various playback sources.
+         * If it's not valid TiVo data we ignore it.
+         *
+         * @param textTrackCue
+         * @private
+         */
+        _processId3Metadata: function (textTrackCue) {
+            var self = this;
+            var frameId = textTrackCue.value.key;
+            var ownerId = textTrackCue.value.info;
+            var data = textTrackCue.value.data;
+
+            if (frameId === 'PRIV' && ownerId === 'TiVo') {
+                // STATS tags come in every 5 seconds but TRACK_INFO tags come in much more frequently than that.
+                // We cannot simply throttle this callback because it is likely we'll miss STATS tags. The overhead
+                // of constantly parsing tags does not seem to affect performance.
+                return self.parseTivoMetadata(data);
+            }
+        }
     });
 
     factory.VideoFlashlsAPI = VideoFlashlsAPI;
+    factory.FlashlsAPI = FlashlsAPI;
+
 })(window, jQuery, _, console);
 
