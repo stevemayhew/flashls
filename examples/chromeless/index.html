@@ -55,8 +55,13 @@ button[disabled] {
     color: gainsboro;
 }
 
+body.use-native-player .hide-for-native {
+    display: none;
+}
 #customButtons input { width: 25%; display : inline-block; text-align: center; font-size: 8pt;}
-#toggleButtons button { width: 12%; display : inline-block; text-align: center; font-size: 8pt; background-color: #A0A0A0 }
+
+.toggleButtons { margin-top: 20px; }
+.toggleButtons button { width: 12%; display : inline-block; text-align: center; font-size: 8pt; background-color: #A0A0A0 }
 
 </style>
   <title>flashls - Chromeless HLS Flash Player</title>
@@ -65,17 +70,11 @@ button[disabled] {
 <meta name="author" content="mangui">
 <meta name="description" content="flashls is an HLS flash plugin/player">
 <meta name="keywords" content="hls, m3u8, http live streaming, apple hls, plugin, h264, H.264, x264, aac, mp3, flash, flashplayer, flash player, video, audio, mbr, multibitrate, multi bitrate, vod, video on demand, live, live stream, dvr, dvr stream, digital video recorder">
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-  ga('create', 'UA-52843650-1', 'auto');
-  ga('send', 'pageview');
-</script>
-
-<script type="text/javascript" src="flashlsAPI.js"></script>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
+    <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.min.js" integrity="sha256-xNjb53/rY+WmG+4L6tTl9m6PpqknWZvRt0rO1SRnJzw=" crossorigin="anonymous"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore.js"></script>
+    <script type="text/javascript" src="hlsplayer.js"></script>
 <script type="text/javascript" src="../libs/ParsedQueryString.js"></script>
 <script type="text/javascript" src="../libs/JSLoaderFragment.js"></script>
 <script type="text/javascript" src="../libs/JSLoaderPlaylist.js"></script>
@@ -83,7 +82,7 @@ button[disabled] {
 <script type="text/javascript" src="../libs/canvas.js"></script>
 <script type="text/javascript" src="../libs/metrics.js"></script>
 <script type="text/javascript" src="../libs/jsonpack.js"></script>
-<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
+    <script type="text/javascript" src="../libs/clippy.js"></script>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
@@ -107,8 +106,8 @@ button[disabled] {
     </header>
     <div id="controls">
         <div id="customButtons">
-            <lable>TCD IP:</lable><input type="text" value="10.100.51.25" id="tcdAddr">
-            <lable>Transcodre IP:</lable><input type="text" value="10.100.51.66" id="xcodeAddr">
+            <lable>TCD IP:</lable><input type="text" value="10.100.51.48" id="tcdAddr">
+            <lable>Transcoder IP:</lable><input type="text" value="10.100.51.48" id="xcodeAddr">
             <button type="button" id="loadShows">Load Shows</button>
             <button type="button" id="startSession">Start Session</button>
 
@@ -119,66 +118,44 @@ button[disabled] {
       <br>
       <div id="StreamPermalink" class="innerControls"></div>
       <span id="currentResolution" style="float:left;font-size: 8pt;">-</span>
+      <span id="streamStartTime" style="float:right;font-size: 8pt;">-</span>
     </div>
 
     <div class="center" id="video">
-        <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
-         codebase="" id="moviename" width="720" height="480">
-        <param name="movie"  value="../../bin/debug/flashlsChromeless.swf?inline=1" />
-        <param name="quality" value="autohigh" />
-        <param name="swliveconnect" value="true" />
-        <param name="allowScriptAccess" value="sameDomain" />
-        <param name="bgcolor" value="#0" />
-        <param name="allowFullScreen" value="true" />
-        <param name="wmode" value="window" />
-        <param name="FlashVars" value="callback=flashlsCallback" />
-
-        <embed src="../../bin/debug/flashlsChromeless.swf?inline=1" width="720" height="480" name="moviename"
-                    quality="autohigh"
-                    bgcolor="#0"
-                    align="middle" allowFullScreen="true"
-                    allowScriptAccess="sameDomain"
-                    type="application/x-shockwave-flash"
-                    swliveconnect="true"
-                    wmode="window"
-                    FlashVars="callback=flashlsCallback"
-                    pluginspage="http://www.macromedia.com/go/getflashplayer" >
-        </embed>
-        </object>
         <br><br>
         <canvas id="buffered_c" width="640" height="15" onclick="buffered_seek(event)";></canvas> <br>
         <br>
+
+        <div class="transport-controls">
+          <button type="button" class="btn btn-sm btn-info" onclick="api.play(-1)">play</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.pause()">pause</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.resume()">resume</button>
+          <button type="button" class="btn btn-sm btn-info skip-button">skip</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()+10)">currentTime+=10</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()-10)">currentTime-=10</button>
+          <button type="button" class="btn btn-sm btn-info" onclick="api.seek($('#seek_pos').val())">seek to </button>
+           <input type="text" id='seek_pos' size="8" onkeydown="if(window.event.keyCode=='13'){api.seek($('#seek_pos').val());}">
+          <button type="button" class="btn btn-sm btn-info" onclick="api.volume($('#vol_val').val())">set volume </button>
+           <input type="text" id='vol_val' size="8" onkeydown="if(window.event.keyCode=='13'){api.volume($('#vol_val').val());}">
+           <table>
+                <tr>
+                  <td>selectable audio tracks</td>
+                </tr>
+                <tr>
+                  <td> <div id="audioControl" style="display: inline;"></div> </td>
+                </tr>
+            </table>
+        </div>
     </div>
-    <div class="center" id="toggleButtons">
+    <div class="center toggleButtons">
       <button type="button" class="btn btn-sm" onclick="$('#PlaybackInfo').toggle();">playback info</button>
-      <button type="button" class="btn btn-sm" onclick="$('#PlaybackControl').toggle();">playback controls</button>
-      <button type="button" class="btn btn-sm" onclick="$('#QualityLevelControl').toggle();">Quality Level controls</button>
-      <button type="button" class="btn btn-sm" onclick="$('#AdvancedControl').toggle();">advanced controls</button>
-      <button type="button" class="btn btn-sm" onclick="$('#MetricsDisplay').toggle();toggleMetricsDisplay();">Metrics Display</button>
-      <button type="button" class="btn btn-sm" onclick="$('#StatsDisplay').toggle();">Stats Display</button>
-      <button type="button" class="btn btn-sm" onclick="$('#VideoStatus').toggle();">Log Message</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#QualityLevelControl').toggle();">Quality Level controls</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#AdvancedControl').toggle();">advanced controls</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#MetricsDisplay').toggle();toggleMetricsDisplay();">Metrics Display</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#StatsDisplay').toggle();">Stats Display</button>
+      <button type="button" class="btn btn-sm hide-for-native" onclick="$('#VideoStatus').toggle();">Log Message</button>
     </div>
 
-    <div id='PlaybackControl'>
-    <h4> Playback Control </h4>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.play(-1)">play</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.pause()">pause</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.resume()">resume</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()+10)">currentTime+=10</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.seek(api.getPosition()-10)">currentTime-=10</button>
-      <button type="button" class="btn btn-sm btn-info" onclick="api.seek($('#seek_pos').val())">seek to </button>
-       <input type="text" id='seek_pos' size="8" onkeydown="if(window.event.keyCode=='13'){api.seek($('#seek_pos').val());}">
-      <button type="button" class="btn btn-sm btn-info" onclick="api.volume($('#vol_val').val())">set volume </button>
-       <input type="text" id='vol_val' size="8" onkeydown="if(window.event.keyCode=='13'){api.volume($('#vol_val').val());}">
-       <table>
-            <tr>
-              <td>selectable audio tracks</td>
-            </tr>
-            <tr>
-              <td> <div id="audioControl" style="display: inline;"></div> </td>
-            </tr>
-        </table>
-    </div>
 
     <div id='QualityLevelControl'>
     <h4> Quality Control </h4>
@@ -319,7 +296,6 @@ button[disabled] {
 $(document).ready(function() {
     $('button').attr('disabled', false);
     $('#streamURL').change(function()           { loadStream($('#streamURL').val());});
-   $("#PlaybackControl").hide();
    $("#PlaybackInfo").hide();
    $("#QualityLevelControl").hide();
    $("#AdvancedControl").hide();
@@ -329,11 +305,53 @@ $(document).ready(function() {
    $('#metricsButtonWindow').toggle(windowSliding);
    $('#metricsButtonFixed').toggle(!windowSliding);
 
-//    var manifest = decodeURIComponent(location.search.split('src=')[1]);
-//    if(manifest === 'undefined') {
-//      manifest = 'http://www.streambox.fr/playlists/x36xhzz/x36xhzz.m3u8';
-//    }
-//    $('#streamURL').val(manifest);
+    window.clippy = null;       // Made global for update the canvas with the buffer/position bar.
+
+    function timedMetadataUpdated(metadata) {
+        var streamStart = metadata.timeStats.startStreamTime.valms;
+        $('#streamStartTime').text(streamStart);
+
+        if (clippy) {
+            var adjusted = clippy.adjustSegments(streamStart);
+
+            $('.skip-button').prop('disabled', !adjusted);
+        }
+    }
+
+    var eventHandlers = $.extend({}, flashlsEvents, {
+        id3Updated: function(id3Data) {
+            var data = atob(id3Data);
+
+            // Incoming data assumed to be a string, since that's what atob() returns.
+            var id3data = [];
+
+            // Skip over the "ID3" header with flags and length: 10 bytes;
+            // Skip over the "PRIV" key with flags and length: 10 bytes.
+            // Skip over the "TiVo" null-terminated info string. 5 bytes.
+            // Total of 25 bytes before we get to the data we care about, assuming this is a TiVo PRIV tag.
+            var offset = 25;
+            for(var x=offset; x < data.length; x++) {
+                id3data.push(data.charCodeAt(x));
+            }
+
+            // Make sure that the incoming data is now an ArrayBuffer, for input to the DataView.
+            id3data = new Uint8Array(id3data).buffer;
+            var metadata = this.parseTivoMetadata(id3data);
+            timedMetadataUpdated(metadata);
+        },
+
+        id3Metadata: function(metadata) {
+            timedMetadataUpdated(metadata);
+        }
+    });
+
+    $('#video').chromelessPlayer({
+        eventHandlers: eventHandlers,
+
+        onReady: function(api) {
+            window.api = api;
+        }
+    });
 
     var mindRpc;
 
@@ -349,25 +367,36 @@ $(document).ready(function() {
 
     var bodyId;
 
+    $('.skip-button').prop('disabled', true);
+    $('.skip-button').click(function() {
+
+        if (clippy) {
+            var nextPosition = clippy.nextContentSegmentStartOffset(api.getPosition());
+            if (nextPosition) {
+                api.seek(nextPosition);
+            }
+        }
+    });
+
     function loadMyShows() {
         mindRpc.request(loadMyShowsReqst, function(response) {
-//            console.log(response);
+            console.log(response);
 //            $('#loadShows').attr("disabled", false);
 
             var titleAndRecording = $.map(response.myShowsItem, function(val) {
                 var show = val.episodeTitle ? val.title + "("+val.episodeTitle+")" : val.title;
-                return { title: show, myShowsItemId: val.myShowsItemId};
+                return { title: show, myShowsItemId: val.myShowsItemId, contentId: val.contentId};
             });
 
             var sorted = titleAndRecording.sort(function(a, b) {
                 return a.title.localeCompare(b.title);
             });
 
-
             $('#streamSelect').empty();
             $.each(sorted, function() {
                 var $option = $('<option>').text(this.title);
                 $option.attr('value', this.myShowsItemId);
+                $option.data('msi', this);
                 $('#streamSelect').append($option);
             });
 
@@ -393,9 +422,13 @@ $(document).ready(function() {
 
     $('#startSession').click(function() {
         $('#streamURL').val("");
-        $()
         var xcodeAddr = $('#xcodeAddr').val();
         var recording = $('#streamSelect').val();
+        var msi = $('#streamSelect > :selected').data('msi');
+
+        clippy = new Clippy(mindRpc);
+        clippy.fetchAdjustedSegments(msi.contentId, msi.myShowsItemId);
+
         if (recording) {
             objectSearch.objectId = recording;
 
@@ -423,8 +456,7 @@ $(document).ready(function() {
                 })
             });
         }
-    })
-
+    });
 });
 
 
@@ -507,18 +539,12 @@ function toggleCapLeveltoStage() {
   api.playerCapLeveltoStage(state);
 }
 
-// Create a single global callback function and pass it's name
-// to the SWF with the name `callback` in the FlashVars parameter.
-window.flashlsCallback = function(eventName, args) {
-  flashlsEvents[eventName].apply(null, args);
-};
-
 var flashlsEvents = {
    ready: function(flashTime) {
     flashPingDate = flashTime;
     jsPingDate = new Date();
     appendLog("onHLSReady()");
-    api = new flashlsAPI(getFlashMovieObject("moviename"));
+    api = this;
     $('#debugLogState').html(api.getLogDebug().toString());
     $('#debug2LogState').html(api.getLogDebug2().toString());
     $('#flushLiveURLState').html(api.getflushLiveURLCache().toString());
@@ -535,8 +561,13 @@ var flashlsEvents = {
         width = $('#video').innerWidth()-30;
         height = Math.round(width / ratio);
     }
-   api.flashObject.width = width;
-   api.flashObject.height = height;
+
+      if (api.setSize) {
+          api.setSize(width, height);
+      } else {
+          api.flashObject.width = width;
+          api.flashObject.height = height;
+      }
    var canvas = $('#buffered_c')[0];
    canvas.width = width;
   },
@@ -797,17 +828,31 @@ function buffered_seek(event) {
 }
 
 function updateBufferCanvas(position,duration,buffer, backbuffer) {
-  var canvas = document.getElementById('buffered_c');
-  var ctx = canvas.getContext('2d');
-  ctx.fillStyle = "black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = "gray";
-  var start = (position-backbuffer)/duration * canvas.width;
-  var end = (position+buffer)/duration * canvas.width;
-  ctx.fillRect(start, 3, Math.max(2, end-start), 10);
-  ctx.fillStyle = "blue";
-  var x = position / duration * canvas.width;
-  ctx.fillRect(x, 0, 2, 15);
+    var canvas = document.getElementById('buffered_c');
+    var ctx = canvas.getContext('2d');
+
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "gray";
+    var start = (position-backbuffer)/duration * canvas.width;
+    var end = (position+buffer)/duration * canvas.width;
+    ctx.fillRect(start, 3, Math.max(2, end-start), 10);
+
+    if (clippy) {
+        var adSegments = clippy.getAdjustedAdSegments();
+        ctx.fillStyle = "#b2851c";
+
+        _.each(adSegments, function(segment) {
+            var start = segment.startOffset / duration * canvas.width;
+            var end = segment.endOffset / duration * canvas.width;
+            ctx.fillRect(start, 3, Math.max(2, end - start), 10);
+        });
+    }
+
+    ctx.fillStyle = "blue";
+    var x = position / duration * canvas.width;
+    ctx.fillRect(x, 0, 2, 15);
 }
 
   function updateLevelInfo() {
