@@ -643,7 +643,9 @@ import flash.events.Event;
                                 } while (sei.bytesAvailable!=0 && payload_size == 0xFF);
                                 // Process the payload. We only support EIA-608 payloads currently.
                                 if (payload_type == 4) {
+                                    var currentPos:Number = sei.position;
                                     readCC(sei,pes.pts);
+                                    sei.position = currentPos + payload_size;
                                 } else {
                                     sei.position+=payload_size;
                                 }
