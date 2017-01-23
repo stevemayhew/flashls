@@ -11,6 +11,21 @@ The plugin is compatible with the following players:
   - [OSMF 2.0](#strobe-media-playback-smp-and-other-osmf-based-players) based players (such as SMP and GrindPlayer)
   - [Video.js][1] 4.6, 4.7, 4.8 (adaptation done here [https://github.com/mangui/video-js-swf][2])
 
+## TiVo Specific Info
+The `dev` branch is the mainline for TiVo (this is the branch updated on github most frequently in the upstream git.  There are two consumers of the code from this branch:
+
+1. This repository itself produces a tivo specific version of the chromeless player used for player debug.  Code for this is `examples/chromeless/index.html` and files it references.
+2. The OSMF flashls swc (we use the `bin/debug/flashlsOSMF.swc` build)
+
+When you need to make changes, follow this:
+
+1. Create a branch and update and merge in `upstream/dev` review the diffs of this in a merge request
+2. Make your changes on a branch review and update with comments from the merge request
+3. Finally, when you branch is merged to `dev` branch, do a build of and checkin the SWF/SWCs
+
+The [medialelement player](http://smayhew-t7500:8080/tve/mediaelement-tivo.git) consumes the `flashlsOSMF.swc`.  Copy the SWC to that project (`flashlsOSMF.swc` in the [`src/flash`](http://smayhew-t7500:8080/tve/mediaelement-tivo/blob/flashls-dev/src/flash/) folder) and rebuild the [`flashmediaelement.swc`](http://smayhew-t7500:8080/tve/mediaelement-tivo/blob/flashls-dev/build/flashmediaelement.swf)
+
+
 ## Features
 
   - VoD & Live playlists
