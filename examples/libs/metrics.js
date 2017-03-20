@@ -94,7 +94,11 @@ var timeRangeMouseDown=false;
  }
 
 var windowDuration=20000,windowSliding=true,windowStart=0,windowEnd=10000,windowFocus,metricsDisplayed=false;
-document.getElementById('windowStart').value=windowStart;document.getElementById('windowEnd').value=windowEnd;
+
+  $(function() {
+      document.getElementById('windowStart').value=windowStart;document.getElementById('windowEnd').value=windowEnd;
+  });
+
   function refreshCanvas()  {
     if(metricsDisplayed) {
       try {

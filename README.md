@@ -11,6 +11,21 @@ The plugin is compatible with the following players:
   - [OSMF 2.0](#strobe-media-playback-smp-and-other-osmf-based-players) based players (such as SMP and GrindPlayer)
   - [Video.js][1] 4.6, 4.7, 4.8 (adaptation done here [https://github.com/mangui/video-js-swf][2])
 
+## TiVo Specific Info
+The `dev` branch is the mainline for TiVo (this is the branch updated on github most frequently in the upstream git.  There are two consumers of the code from this branch:
+
+1. This repository itself produces a tivo specific version of the chromeless player used for player debug.  Code for this is `examples/chromeless/index.html` and files it references.
+2. The OSMF flashls swc (we use the `bin/debug/flashlsOSMF.swc` build)
+
+When you need to make changes, follow this:
+
+1. Create a branch and update and merge in `upstream/dev` review the diffs of this in a merge request
+2. Make your changes on a branch review and update with comments from the merge request
+3. Finally, when you branch is merged to `dev` branch, do a build of and checkin the SWF/SWCs
+
+The [medialelement player](http://smayhew-t7500:8080/tve/mediaelement-tivo.git) consumes the `flashlsOSMF.swc`.  Copy the SWC to that project (`flashlsOSMF.swc` in the [`src/flash`](http://smayhew-t7500:8080/tve/mediaelement-tivo/blob/flashls-dev/src/flash/) folder) and rebuild the [`flashmediaelement.swc`](http://smayhew-t7500:8080/tve/mediaelement-tivo/blob/flashls-dev/build/flashmediaelement.swf)
+
+
 ## Features
 
   - VoD & Live playlists
@@ -248,8 +263,9 @@ After a successful build you will find fresh binaries in the `bin/debug` and `bi
 |<img src="http://press.dailymotion.com/fr/wp-content/uploads/sites/4/2010/06/LOGO-PRESS-BLOG.png" width="80">   |[Dailymotion](http://www.dailymotion.com)|
 |<img src="https://flowplayer.org/media/img/logo-blue.png" width="160">  |[FlowPlayer](http://www.flowplayer.org/)|
 |<img src="https://cloud.githubusercontent.com/assets/244265/12556435/dfaceb48-c353-11e5-971b-2c4429725469.png" width="160">  |[globo.com](https://www.globo.com)|
-|<img src="http://tidal.com/images/tidal-large-black.c8af31d9.png" width="160">  |[Tidal](https://listen.tidal.com/)|
 |<img src="https://cloud.githubusercontent.com/assets/244265/12556385/999aa884-c353-11e5-9102-79df54384498.png" width="160">  |[The New York Times](https://www.nytimes.com)|
+|<img src="https://www.radiantmediaplayer.com/images/radiantmediaplayer-new-logo-640.jpg" width="160">  |[Radiant Media Player](https://www.radiantmediaplayer.com/)|
+|<img src="http://tidal.com/images/tidal-large-black.c8af31d9.png" width="160">  |[Tidal](https://listen.tidal.com/)|
 |<img src="https://www.ubicast.eu/static/website/img/header/logo_ubicast.svg" width="160">  |[Ubicast](https://www.ubicast.eu)|
 
 ## Donation

@@ -1,6 +1,17 @@
+//////////////////////////////////////////////////////////////////////
+//
+// File: MindRpc.js
+//
+// Copyright 2016 TiVo Inc. All Rights Reserved.
+//
+//////////////////////////////////////////////////////////////////////
+
+/*global MindRpc*/              // MindRpc.js
+/*global debug*/                // console_wrapper.js
+
 (function(factory, $, debug) {
     factory.MindRpc = function(config) {
-        var schemaVersion = 15;
+        this.mSchemaVersion = 22;
         this.mSecure = 0;
         this.mPort = 0;
         this.mStandardHeaders = ["Content-type: application/json"];
@@ -20,7 +31,7 @@
             this.mPort = config.port;
         }
         if (!!config.schemaVersion) {
-            schemaVersion = config.schemaVersion;
+            this.mSchemaVersion = config.schemaVersion;
         }
         if (!!config.appName) {
             this.mStandardHeaders.push("ApplicationName: " + config.appName);
@@ -38,9 +49,6 @@
             this.mStandardHeaders.push("HardwareIdentifier: " + config.hwId);
         }
 
-        // always add a schema version
-        this.mStandardHeaders.push("SchemaVersion: " + schemaVersion);
-
         // empty line separator (need two to get final \r\n)
         this.mStandardHeaders.push("");
         this.mStandardHeaders.push("");
@@ -48,7 +56,21 @@
 
     $.extend(MindRpc.prototype, {
 
-        start: function() {
+        /**
+         * Returns a promise to start the webSocket.
+         *
+         * The promise resolves when the socket is opened (transitions to readyState 1) and rejects if the
+         * WebSocket fails to open right out of the gate.
+         *
+         * If the websocket subsequently is closed by the remote peer, or has any other kind of error then the
+         * onclose or onerror methods are called.
+         *
+         * Promise state:
+         *  - progress:  {state: [open, authenticated, failed], mindRpc: this}
+         *
+         * @returns {*}
+         */
+        startMindRpcWebSocket: function() {
             var result = new $.Deferred();
             var self = this;
 
@@ -61,15 +83,15 @@
 
                 self.stop();
 
-                var url = (this.mSecure ? "wss" : "ws") + "://";
-                url += this.mHost + (this.mPort ? (":" + this.mPort) : "");
+                self._url = (this.mSecure ? "wss" : "ws") + "://";
+                self._url += this.mHost + (this.mPort ? (":" + this.mPort) : "");
 
                 try {
-                    this.mWs = new WebSocket(url, "com.tivo.mindrpc.2");
+                    this.mWs = new WebSocket(self._url, "com.tivo.mindrpc.2");
                 }
                 catch (err) {
                     result.reject(-1, "WebSocket create failed" + err);
-                    debug.error("Unable to open websocket", err);
+                    debug.error("Unable to open websocket to "+self._url+" ", err);
                 }
 
                 this.mWs.onopen = function() {
@@ -81,22 +103,25 @@
                     self.onmessage(event);
                 };
                 this.mWs.onerror = function(event) {
+                    debug.log("Websocket to "+self._url+" onerror, event code: "+event.code);
+
                     self.onerror(event);
                 };
                 this.mWs.onclose = function(event) {
-                    if (self.connectionTimer) {
-                        clearTimeout(self.connectionTimer);
-                        self.connectionTimer = null;
-                    }
-                    if (self.monitorPromise) {
-                        self.monitorPromise.reject(self.mWs.readyState, "onclosed");
-                        self.monitorPromise = null;
-                    }
+                    debug.log("Websocket to "+self._url+" onclose, event code: "+event.code);
 
-                    self.listeners = [];
                     self.onclose(event);
-                };
 
+                    self.mWs = null;
+                    self.mMaxRpcId = 0;
+                    self.mListeners = {};
+
+                    if (event.code === 1006) {
+                        debug.log('onclose', event.code);
+                        // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
+                        result.reject(-1006, "Websocket abnormal close");
+                    }
+                };
             }
 
             if (self.mWs.readyState === 1 && result.state() === "pending") {
@@ -107,79 +132,81 @@
         },
 
         stop: function() {
+            var self = this;
+
             if (self.mWs) {
+                debug.log("Closing MindRrc websocket to %s ", self.mHost);
+
                 try {
                     self.mWs.close();
+                    debug.log("Close success");
+
                 } catch (err) {
                     debug.error("Unable to close websocket: " + err);
                 }
+                self.mWs = null;
+                self.mMaxRpcId = 0;
+                self.mListeners = {};
             }
         },
 
-        monitorConnection: function(pollTime) {
-            var monitor = this.monitorPromise;
+        isPendingRequests: function() {
             var self = this;
+            var isPendingRequest = false;
 
-            pollTime = pollTime ? Math.max(4000, pollTime) : 4000;
-
-            function setPollForTimeout() {
-                //debug.log("Restarting timeout poll at %s, pollTime %d", new Date(), pollTime);
-                if (self.connectionTimer) {
-                    clearTimeout(self.connectionTimer);
+            for (var rpcId in self.mListeners) {
+                if (self.mListeners[rpcId] !== null) {
+                    isPendingRequest = true;
+                    break;
                 }
-                self.connectionTimer = setTimeout(function() {
-                    debug.log("Poll timeout! at %s", new Date());
-                    if (monitor.state() === "pending") {
-                        monitor.reject(self.mWs.readyState, "timeout");
-                    } else {
-                        debug.log("Poll already reported");
-                    }
-                }, pollTime);
             }
-
-            if (! monitor) {
-                monitor = new $.Deferred();
-                setPollForTimeout();
-                self.requestMonitoring({type: "ping", response: {type: "pong"}}, function(response) {
-                    //debug.log("ping response", response);
-                    setPollForTimeout();
-                });
-            }
-            return monitor;
+            return isPendingRequest;
         },
 
-        request: function(mdo, listener, appFeatureArea) {
+        request: function(mdo, listener, extraHeaders) {
             var rpcId = ++this.mMaxRpcId;
 
             this.mListeners[rpcId] = listener;
 
-            this.sendRequest("request", rpcId, mdo, "single", appFeatureArea);
+            this.sendRequest("request", rpcId, mdo, "single", extraHeaders);
             return rpcId;
         },
 
-        requestMonitoring: function(mdo, listener, appFeatureArea) {
+        requestMonitoring: function(mdo, listener, extraHeaders) {
             var rpcId = ++this.mMaxRpcId;
 
             this.mListeners[rpcId] = listener;
 
-            this.sendRequest("request", rpcId, mdo, "multiple", appFeatureArea);
+            this.sendRequest("request", rpcId, mdo, "multiple", extraHeaders);
             return rpcId;
         },
 
-        fireAndForget: function(mdo, appFeatureArea) {
-            this.sendRequest("request", ++this.mMaxRpcId, mdo, "none", appFeatureArea);
+        fireAndForget: function(mdo, extraHeaders) {
+            this.sendRequest("request", ++this.mMaxRpcId, mdo, "none", extraHeaders);
         },
 
-        requestUpdate: function(rpcId, mdo) {
-            this.sendRequest("requestUpdate", rpcId, mdo, null, null);
+        requestUpdate: function(rpcId, mdo, extraHeaders) {
+            this.sendRequest("requestUpdate", rpcId, mdo, null, extraHeaders);
         },
 
-        cancelRequest: function(rpcId) {
+        cancelRequest: function(rpcId, extraHeaders) {
             var headerArray = [
                 "Type: cancel",
                 "RpcId: " + rpcId,
                 "", "" // need two to get final \r\n
             ];
+
+            extraHeaders = extraHeaders || {};
+
+            // Use the default schema version if none is specified in the extra headers.
+            extraHeaders.SchemaVersion = extraHeaders.SchemaVersion || this.mSchemaVersion;
+
+            for (var headerName in extraHeaders) {
+                // Only add in a header if it has an actual value.
+                if (extraHeaders[headerName]) {
+                    headerArray.push(headerName + ": " + extraHeaders[headerName]);
+                }
+            }
 
             var header = headerArray.join("\r\n");
             var msg = "MRPC/2 " + header.length + " 0\r\n" + header;
@@ -194,7 +221,7 @@
             this.mListeners[rpcId] = null;
         },
 
-        sendRequest: function(type, rpcId, mdo, responseCount, appFeatureArea) {
+        sendRequest: function(type, rpcId, mdo, responseCount, extraHeaders) {
             var headerArray = [
                 "Type: " + type,
                 "RpcId: " + rpcId,
@@ -202,8 +229,26 @@
                 "ResponseCount: " + responseCount
             ];
 
-            if (!!appFeatureArea) {
-                headerArray.push("ApplicationFeatureArea: " + appFeatureArea);
+            extraHeaders = extraHeaders || {};
+
+            // Backwards compatibility.
+            if (typeof extraHeaders === "string") {
+                extraHeaders = {
+                    ApplicationFeatureArea: extraHeaders
+                };
+            }
+
+            // Use the default schema version if none is specified in the extra headers.
+            extraHeaders.SchemaVersion = extraHeaders.SchemaVersion || this.mSchemaVersion;
+
+            // Use the bodyId specified in the request, and fall back to one specified in the extraHeaders.
+            extraHeaders.BodyId = mdo.bodyId || extraHeaders.BodyId;
+
+            for (var headerName in extraHeaders) {
+                // Only add headers that have an actual value.
+                if (extraHeaders[headerName]) {
+                    headerArray.push(headerName + ": " + extraHeaders[headerName]);
+                }
             }
 
             headerArray = headerArray.concat(this.mStandardHeaders);
@@ -217,7 +262,7 @@
             try {
                 this.mWs.send(msg);
             } catch (e) {
-                debug.error("Websocket send failed: ", e);
+                debug.error("Websocket send to "+this._url+" failed: ", e);
                 this.onerror();
             }
         },
@@ -234,7 +279,7 @@
             // extract body
             var body = event.data.substr(preheader.length + 2 /* skip newline */ + Number(preheaderParts[1]));
 
-            if (body.length != preheaderParts[2]) {
+            if (String(body.length) !== preheaderParts[2]) {
                 debug.warn("Marshalled data mismatch: body length = " + body.length + ", header said = " + preheaderParts[2]);
             }
 
@@ -244,13 +289,13 @@
             var isFinal = true;
             for (var i in headerParts) {
                 var headerPart = headerParts[i];
-                var tag = headerPart.split(":", 1);
-                if (tag == "RpcId") {
+                var tag = headerPart.split(":", 1)[0];
+                if (tag === "RpcId") {
                     rpcId = parseInt(headerPart.slice(6), 10);
                 }
 
-                if (tag == "IsFinal") {
-                    isFinal = (headerPart.slice(8) == 'true');
+                if (tag === "IsFinal") {
+                    isFinal = (headerPart.slice(8).trim() === 'true');
                 }
             }
 
@@ -262,7 +307,7 @@
                 } catch (e) {
                     debug.warn("Unparseable JSON body for RPCid: "+rpcId+" error:", e);
                 }
-                this.mListeners[rpcId](mdo, isFinal);
+                this.mListeners[rpcId](mdo, isFinal, headerParts);
                 if (isFinal) {
                     // clear listener if no more responses
                     this.mListeners[rpcId] = null;
@@ -270,15 +315,11 @@
             }
         },
 
-        onerror: function(event) {
-            debug.warn("Internal server connection error (WebSockets)");
-        },
+        onclose: function(event) { }, // JS eq. to pure virtual, this is overwritten by MindClient
 
-        onclose: function(event) {
-            debug.log("Websocket onclose", event);
-        }
+        onerror: function(event) { } // JS eq. to pure virtual, this is overwritten by MindClient
     });
-})(window, jQuery, console);
+})(window, jQuery, debug);
 
 
 
