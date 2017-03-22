@@ -116,8 +116,8 @@ body.use-native-player .hide-for-native {
     </header>
     <div id="controls">
         <div id="customButtons">
-            <lable>TCD IP:</lable><input class="ip-addr" type="text" value="10.100.51.48" id="tcdAddr">
-            <lable>Transcoder IP:</lable><input class="ip-addr" type="text" value="10.100.51.48" id="xcodeAddr">
+            <lable>TCD IP:</lable><input class="ip-addr" type="text" value="tivo-8FA0001901E2667" id="tcdAddr">
+            <lable>Transcoder IP:</lable><input class="ip-addr" type="text" value="" id="xcodeAddr">
             <button type="button" id="loadShows">Load Shows</button>
             <button type="button" id="loadchannels">Load Channels</button>
             <button type="button" id="startSession">Start Session</button>
@@ -463,7 +463,7 @@ $(document).ready(function() {
             mindRpc = new MindRpc({
                 secure: 0,
                 host: $('#tcdAddr').val(),
-                port: 2412
+                port: 1500
             });
         }
         mindRpc.startMindRpcWebSocket().done(loadChannels)
@@ -482,45 +482,46 @@ $(document).ready(function() {
         if (recording) {
             objectSearch.objectId = recording;
 
-        bodyId = bodyId || "8F00000001EE678";
-//        bodyId = bodyId || "8D000019032A848";
+            bodyId = bodyId || "8F00000001EE678";
+    //        bodyId = bodyId || "8D000019032A848";
 
-        function startSession(mfsId) {
-            var startSess = $.ajax('http://' + xcodeAddr + ':49152/sysinfo/control', {
-                data: {
-                    config: 'session',
-                    action: 'acquire',
-                    tsn: bodyId,
-                    fsid: mfsId,
-                    xkey: 'hls',
-                    ifver: 1
-                },
-                global: false,          // Needed to avoid headers that cause the CORS logic to attempt an OPTIONS request.
-                dataType: 'json'        // Stream lies, says it's text/html
-            });
+            function startSession(mfsId) {
+                var startSess = $.ajax('http://' + xcodeAddr + ':49152/sysinfo/control', {
+                    data: {
+                        config: 'session',
+                        action: 'acquire',
+                        tsn: bodyId,
+                        fsid: mfsId,
+                        xkey: 'hls',
+                        ifver: 1
+                    },
+                    global: false,          // Needed to avoid headers that cause the CORS logic to attempt an OPTIONS request.
+                    dataType: 'json'        // Stream lies, says it's text/html
+                });
 
-                startSess.done(function(data, statusText, jqXhr) {
-                    var url = 'http://' + xcodeAddr + ':49152/session-streaming/' + data.contextid + '.m3u8';
+                    startSess.done(function(data, statusText, jqXhr) {
+                        var url = 'http://' + xcodeAddr + ':49152/session-streaming/' + data.contextid + '.m3u8';
 
-                $('#streamURL').val(url);
-                console.log("session: " + url)
-            });
+                    $('#streamURL').val(url);
+                    console.log("session: " + url)
+                });
 
-            startSess.fail(function(data, statusText, jqXhr) {
-                console.log(data, statusText, jqXhr)
-            })
+                startSess.fail(function(data, statusText, jqXhr) {
+                    console.log(data, statusText, jqXhr)
+                })
 
-        }
+            }
 
-        if (fsid) {
-            startSession(fsid);
-        } else if (recording) {
-            objectSearch.objectId = recording;
+            if (fsid) {
+                startSession(fsid);
+            } else if (recording) {
+                objectSearch.objectId = recording;
 
-            mindRpc.request(objectSearch, function(objectResult) {
-                var mfsId = objectResult.objectId[0].split('.')[1];  // Just the number part.
-                startSession(mfsId);
-            });
+                mindRpc.request(objectSearch, function(objectResult) {
+                    var mfsId = objectResult.objectId[0].split('.')[1];  // Just the number part.
+                    startSession(mfsId);
+                });
+            }
         }
     }
 
@@ -536,6 +537,7 @@ $(document).ready(function() {
                 encryptionType:"hlsAes128Cbc"
             },
             isLocal:true,
+            hlsStreamDesiredVariantsSet: "ABR",
             stbChannelId:channel.stbChannelId,
             type:"hlsStreamLiveTvRequest"
         };
@@ -566,7 +568,7 @@ $(document).ready(function() {
             startRecordingPlaySession(msi);
         }
 
-        var channel = $streamSelect.data('channel')
+        var channel = $streamSelect.data('channel');
         if (channel) {
             startLiveTvSession(channel);
         }
@@ -697,8 +699,8 @@ var flashlsEvents = {
     showCanvas();
     levels = levels_;
     updateLevelInfo();
-    api.play(-1);
-    api.volume(10);
+//    api.play(-1);
+//    api.volume(10);
     var event = {
                 type : "manifest",
                 name : "",
